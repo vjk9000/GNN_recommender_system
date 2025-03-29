@@ -1,1 +1,10 @@
+# General
+**/*/__pycache__
 
+# Blair models
+custom_blair/**/*
+
+
+# Data 
+data/*.csv
+data/**/*.pt
