@@ -134,13 +134,13 @@ def train_model(model, train_edge_index, train_edge_weights, val_edge_index, val
     best_model_epoch = None
 
     # Move to the device 
-    model.to(device)
-    user_features = user_features.to(device)
-    product_features = product_features.to(device)
-    train_edge_index = train_edge_index.to(device)
-    train_edge_weights = train_edge_weights.to(device)
-    val_edge_index = val_edge_index.to(device)
-    val_edge_weights = val_edge_weights.to(device)
+    # model.to(device)
+    # user_features = user_features.to(device)
+    # product_features = product_features.to(device)
+    # train_edge_index = train_edge_index.to(device)
+    # train_edge_weights = train_edge_weights.to(device)
+    # val_edge_index = val_edge_index.to(device)
+    # val_edge_weights = val_edge_weights.to(device)
 
     # training loop across epochs
     for epoch in range(1, num_epochs + 1):
@@ -183,11 +183,11 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model.to(device)
-    test_edge_index = test_edge_index.to(device)
-    test_edge_weights = test_edge_weights.to(device)
-    user_features = user_features.to(device)
-    product_features =  product_features.to(device)
+    # model.to(device)
+    # test_edge_index = test_edge_index.to(device)
+    # test_edge_weights = test_edge_weights.to(device)
+    # user_features = user_features.to(device)
+    # product_features =  product_features.to(device)
 
     # Final evaluation on test set
     model.eval()
@@ -200,6 +200,6 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
         temp_state = model.state_dict()
         model.load_state_dict(best_state)
         best_test_predictions = model(test_edge_index, user_features, product_features)
-        best_test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
+        best_test_loss = nn.functional.mse_loss(best_test_predictions, test_edge_weights)
         model.load_state_dict(temp_state)
         print(f"Best possible loss: {best_test_loss:.4f}")

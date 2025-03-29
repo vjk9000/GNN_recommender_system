@@ -7,9 +7,9 @@ def recommend_products(model, user_id, user_mapping, product_mapping, user_featu
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # move to gpu
-    model.to(device)
-    user_features = user_features.to(device) 
-    product_features = product_features.to(device)
+    # model.to(device)
+    # user_features = user_features.to(device) 
+    # product_features = product_features.to(device)
 
     model.eval()
 
@@ -57,9 +57,9 @@ def paper_evaluation(model, user_idx, recomended_idx, prod_map_len, user_feature
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
     model.eval()
-    model.to(device)
-    user_features = user_features.to(device)
-    product_features =  product_features.to(device)
+    # model.to(device)
+    # user_features = user_features.to(device)
+    # product_features =  product_features.to(device)
 
     product_nodes = list(range(prod_map_len))
 
