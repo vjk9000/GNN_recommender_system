@@ -7,7 +7,7 @@ def BLaIR_roberta_base_text_embedding_model(description_list, batch_size = 64, m
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    description_list = list(description_list.apply(lambda x: ' '.join(x)))
+    # description_list = list(description_list.apply(lambda x: ' '.join(x))) # consider to drop
     tokenizer = AutoTokenizer.from_pretrained("hyp1231/blair-roberta-base")
     model = AutoModel.from_pretrained("hyp1231/blair-roberta-base")
     
@@ -35,7 +35,7 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size = 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
     
-    description_list = list(description_list.apply(lambda x: ' '.join(x)))
+    # description_list = list(description_list.apply(lambda x: ' '.join(x))) # consider to drop
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModel.from_pretrained(model_dir)
     
@@ -61,6 +61,7 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size = 
 def instantiate_users(arg_1, arg_2 = None):
     # Either pass in two number for the user nodes (num user, num features) 
     # Or pass in a df of the user_id to the required features 
-    if arg_2 is None:
-        return torch.tensor(arg_1.drop("user_id", axis = 1).to_numpy(), dtype = torch.float) 
-    return torch.zeros((arg_1, arg_2), dtype=torch.float)
+    if type(arg_1) == int:
+        return torch.zeros((arg_1, arg_2), dtype=torch.float) 
+    t1 = torch.tensor(arg_1.drop(["user_id", "reviews"], axis = 1).to_numpy(), dtype = torch.float) 
+    return torch.cat([t1, arg_2], dim=1)

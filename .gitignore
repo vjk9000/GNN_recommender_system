@@ -6,5 +6,4 @@ custom_blair/**/*
 
 
 # Data 
-data/*.csv
-data/**/*.pt
+data/
