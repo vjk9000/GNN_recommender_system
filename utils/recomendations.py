@@ -33,7 +33,7 @@ def recommend_products(model, user_id, user_mapping, product_mapping, user_featu
     reverse_mapping = {idx: asin for asin, idx in product_mapping.items()}
     recommended_products = [reverse_mapping[idx.item()] for idx in top_indices]
 
-    return recommended_products
+    return recommended_products, predictions
 
 def pretty_print_recomendations(recommended_asins, product_df, col):
     for index, asin in enumerate(recommended_asins, start=1):

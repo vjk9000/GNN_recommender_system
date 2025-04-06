@@ -5,6 +5,8 @@ import torch.nn as nn
 
 import matplotlib.pyplot as plt
 
+import copy
+
 def plot_loss(train_loss, validation_loss):
     # plot loss curves
     plt.figure(figsize=(10, 6))
@@ -170,7 +172,7 @@ def train_model(model, train_edge_index, train_edge_weights, val_edge_index, val
 
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            best_model_state = model.state_dict()
+            best_model_state = copy.deepcopy(model.state_dict())
             best_model_epoch = epoch
 
         # print progress
