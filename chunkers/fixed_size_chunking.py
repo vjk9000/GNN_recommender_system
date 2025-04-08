@@ -27,6 +27,7 @@ class FixedSizeChunker:
         # for chunk in input_id_chunks:
         # print(len(chunk))
 
+        # reference: https://medium.com/data-science/how-to-apply-transformers-to-any-length-of-text-a5601410af7f
         for i in range(len(input_id_chunks)):
             input_id_chunks[i], mask_chunks[i] = add_sos_and_bos(self, input_id_chunks[i], mask_chunks[i])
             req_pad_len = TOKEN_LENGTH_PER_CHUNK - input_id_chunks[i].shape[0]
