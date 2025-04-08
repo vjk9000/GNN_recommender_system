@@ -1,16 +1,18 @@
-from nltk import PunktSentenceTokenizer
+import itertools
+
 import pandas as pd
 import torch
-import itertools
-from transformers import AutoModel, AutoTokenizer, AutoConfig
+from nltk import PunktSentenceTokenizer
+from transformers import AutoModel, AutoTokenizer
 
 from constants import MODEL_NAME, PRODUCT_DF_FILEPATH
 from utils.embedding_utils import add_sos_and_bos, aggregate_embeddings
 
 
-class SentenceChunker():
+class SentenceChunker:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.agg_method = 'mean'
         self.sentence_tokenizer = PunktSentenceTokenizer()
         self.model_tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.model = AutoModel.from_pretrained(MODEL_NAME).to(self.device)
@@ -40,13 +42,16 @@ class SentenceChunker():
         print(f'number of chunks for sentence chunking: {input_chunks.shape[0]}')
         input_chunks = input_chunks.to(self.device)
         mask = mask.to(self.device)
-        embeddings = aggregate_embeddings(input_chunks, mask, method)
+        embeddings = aggregate_embeddings(self, input_chunks, mask, self.agg_method)
         return embeddings
 
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     chunker = SentenceChunker()
     product_df = pd.read_csv(PRODUCT_DF_FILEPATH)
 
-    sample_product_df = product_df.iloc[0:5]
-    sample_product_df['sentence_chunk'] = sample_product_df['reviews'].apply(lambda review: chunker.chunk_and_embed(review))
+    sample_product_df = product_df.iloc[0:5].copy()
+    sample_product_df.loc[:, 'sentence_chunk'] = sample_product_df['reviews'].apply(lambda review: chunker.chunk_and_embed(review))
+    print(f'shape of embedding for first entry: {sample_product_df.sentence_chunk.iloc[0].shape}')  # unique for each row - will be no. tokens x model embedding dim
+    sample_product_df.head()

@@ -8,9 +8,10 @@ from utils.embedding_utils import add_sos_and_bos, aggregate_embeddings
 TOKEN_LENGTH_PER_CHUNK = 512
 
 
-class FixedSizeChunker():
+class FixedSizeChunker:
     def __init__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.agg_method = 'mean'
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.model = AutoModel.from_pretrained(MODEL_NAME).to(self.device)
         self.model.eval()
@@ -26,14 +27,12 @@ class FixedSizeChunker():
         # for chunk in input_id_chunks:
         # print(len(chunk))
 
-        # reference: https://medium.com/data-science/how-to-apply-transformers-to-any-length-of-text-a5601410af7f
         for i in range(len(input_id_chunks)):
-            input_id_chunks[i], mask_chunks[i] = add_sos_and_bos(input_id_chunks[i], mask_chunks[i])
+            input_id_chunks[i], mask_chunks[i] = add_sos_and_bos(self, input_id_chunks[i], mask_chunks[i])
             req_pad_len = TOKEN_LENGTH_PER_CHUNK - input_id_chunks[i].shape[0]
 
             if req_pad_len > 0:
-                input_id_chunks[i] = torch.nn.functional.pad(input_id_chunks[i], (0, req_pad_len),
-                                                             value=self.tokenizer.pad_token_id)
+                input_id_chunks[i] = torch.nn.functional.pad(input_id_chunks[i], (0, req_pad_len), value=self.tokenizer.pad_token_id)
                 mask_chunks[i] = torch.nn.functional.pad(mask_chunks[i], (0, req_pad_len), value=0)
 
         return torch.stack(input_id_chunks).long(), torch.stack(mask_chunks)
@@ -43,15 +42,17 @@ class FixedSizeChunker():
         print(f'number of chunks for fixed sized chunking: {input_chunks.shape[0]}')
         input_chunks = input_chunks.to(self.device)
         mask = mask.to(self.device)
-        embeddings = aggregate_embeddings(input_chunks, mask, method)
+        embeddings = aggregate_embeddings(self, input_chunks, mask, self.agg_method)
         return embeddings
 
 
 if __name__ == "__main__":
+    torch.cuda.empty_cache()
     chunker = FixedSizeChunker()
     product_df = pd.read_csv(PRODUCT_DF_FILEPATH)
 
-    sample_product_df = product_df.iloc[0:5]
+    sample_product_df = product_df.iloc[0:5].copy()
     # TODO: optimize this
-    sample_product_df['embedding_fixed_chunk'] = sample_product_df['reviews'].apply(
-        lambda review: chunker.chunk_and_embed(review))
+    sample_product_df['embedding_fixed_chunk'] = sample_product_df['reviews'].apply(lambda review: chunker.chunk_and_embed(review))
+    print(f'shape of embedding for first entry: {sample_product_df.embedding_fixed_chunk.iloc[0].shape}')  # this will be token_length per chunk x model embedding dim
+    sample_product_df.head()
