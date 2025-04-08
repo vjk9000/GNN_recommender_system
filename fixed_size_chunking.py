@@ -3,6 +3,7 @@ import torch
 from transformers import AutoModel, AutoTokenizer, AutoConfig
 
 from constants import PRODUCT_DF_FILEPATH, MODEL_NAME
+from utils.embedding_utils import add_sos_and_bos, aggregate_embeddings
 
 TOKEN_LENGTH_PER_CHUNK = 512
 
@@ -11,11 +12,6 @@ class FixedSizeChunker():
         self.device = torch.device("cuda" if torch.cuda.is_available() else "mps")
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.model = AutoModel.from_pretrained(MODEL_NAME).to(self.device)
-
-        # self.config = AutoConfig.from_pretrained(MODEL_NAME)
-        # self.tokenizer.save_pretrained('./pretrained_weights/tokenizer')
-        # self.model.save_pretrained('./pretrained_weights/model')
-        # self.config.save_pretrained('./pretrained_weights/config')
         self.model.eval()
 
     def fixed_size_chunking(self, review):
@@ -29,12 +25,9 @@ class FixedSizeChunker():
         # for chunk in input_id_chunks:
         # print(len(chunk))
 
+        #reference: https://medium.com/data-science/how-to-apply-transformers-to-any-length-of-text-a5601410af7f
         for i in range(len(input_id_chunks)):
-            input_id_chunks[i] = torch.cat(
-                (torch.Tensor([101]).to(self.device), input_id_chunks[i], torch.Tensor([102]).to(self.device)))
-            mask_chunks[i] = torch.cat(
-                [torch.Tensor([1]).to(self.device), mask_chunks[i], torch.Tensor([1]).to(self.device)])
-
+            input_id_chunks[i], mask_chunks[i] = add_sos_and_bos(input_id_chunks[i], mask_chunks[i])
             req_pad_len = TOKEN_LENGTH_PER_CHUNK - input_id_chunks[i].shape[0]
 
             if req_pad_len > 0:
@@ -44,20 +37,12 @@ class FixedSizeChunker():
 
         return torch.stack(input_id_chunks).long(), torch.stack(mask_chunks)
 
-    def aggregate_embeddings(self, input_id_chunks, attn_mask_chunks, method='mean'):
-        output = self.model(input_id_chunks, attn_mask_chunks)
-        if method == 'mean':
-            return output.last_hidden_state.mean(dim=0)
-            # check again
-        if method == 'maxpool':
-            return output.last_hidden_state.max(dim=0)
-
     def chunk_and_embed(self, review, method='mean'):
         input_chunks, mask = self.fixed_size_chunking(review)
         print(f'number of chunks: {input_chunks.shape[0]}')
         input_chunks = input_chunks.to(self.device)
         mask = mask.to(self.device)
-        embeddings = self.aggregate_embeddings(input_chunks, mask, method)
+        embeddings = aggregate_embeddings(input_chunks, mask, method)
         return embeddings
 
 
