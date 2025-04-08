@@ -1,15 +1,21 @@
 import pandas as pd
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, AutoConfig
 
-from constants import PRODUCT_DF_FILEPATH, MODEL_NAME, TOKEN_LENGTH_PER_CHUNK
+from constants import PRODUCT_DF_FILEPATH, MODEL_NAME
 
+TOKEN_LENGTH_PER_CHUNK = 512
 
 class FixedSizeChunker():
-    def __int__(self):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "mps")
         self.tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
         self.model = AutoModel.from_pretrained(MODEL_NAME).to(self.device)
+
+        # self.config = AutoConfig.from_pretrained(MODEL_NAME)
+        # self.tokenizer.save_pretrained('./pretrained_weights/tokenizer')
+        # self.model.save_pretrained('./pretrained_weights/model')
+        # self.config.save_pretrained('./pretrained_weights/config')
         self.model.eval()
 
     def fixed_size_chunking(self, review):
@@ -59,7 +65,8 @@ if __name__ == "__main__":
     chunker = FixedSizeChunker()
     product_df = pd.read_csv(PRODUCT_DF_FILEPATH)
 
-    sample_product_df = product_df.iloc[0:10]
-    sample_product_df['embedding_fixed_chunk'] = [chunker.chunk_and_embed(review) for review in sample_product_df['reviews']]
+    sample_product_df = product_df.iloc[0:5]
+    # TODO: optimize this
+    sample_product_df['embedding_fixed_chunk'] = sample_product_df['reviews'].apply(lambda review: chunker.chunk_and_embed(review))
     print(f'shape of embedding: {sample_product_df.embedding_fixed_chunk.iloc[0].shape}')
     print(sample_product_df.head())
