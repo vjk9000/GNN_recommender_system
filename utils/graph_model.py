@@ -8,11 +8,7 @@ class BaseGNNRecommender(nn.Module):
     def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
         super(BaseGNNRecommender, self).__init__()
 
-        # user and product embedding layers
-        self.user_embedding = nn.Embedding(num_users, embedding_dim)
-        self.product_embedding = nn.Embedding(num_products, embedding_dim)
-
-        # feature transformation layers
+        # feature transformation embedding_dim
         self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
         self.product_feature_transform = nn.Linear(product_feature_dim, embedding_dim)
 
@@ -22,18 +18,20 @@ class BaseGNNRecommender(nn.Module):
 
         # prediction layer
         self.predictor = nn.Sequential(
-            nn.Linear(embedding_dim * 2, embedding_dim),
+            nn.Linear(embedding_dim, embedding_dim),
             nn.ReLU(),
             nn.Linear(embedding_dim, 1)
         )
 
     def forward(self, edge_index, user_features, product_features):
+
+        # Obtains raw user and product indices
         user_indices = edge_index[0]
-        product_indices = edge_index[1]
+        product_indices = edge_index[1] - user_features.shape[0]
 
         # transform features
-        user_x = self.user_feature_transform(user_features) + self.user_embedding.weight
-        product_x = self.product_feature_transform(product_features) + self.product_embedding.weight
+        user_x = self.user_feature_transform(user_features)
+        product_x = self.product_feature_transform(product_features)
 
         # combine user and product features
         x = torch.cat([user_x, product_x], dim=0)
@@ -41,7 +39,7 @@ class BaseGNNRecommender(nn.Module):
         # combined edge index for message passing
         combined_edge_index = torch.cat([
             edge_index,
-            torch.stack([edge_index[1] + len(user_x), edge_index[0]], dim=0)
+            torch.stack([edge_index[1], edge_index[0]], dim=0)
         ], dim=1)
 
         # GNN layers
@@ -56,14 +54,83 @@ class BaseGNNRecommender(nn.Module):
         user_emb = user_embeddings[user_indices]
         product_emb = product_embeddings[product_indices]
 
-        # concat user and product embeddings for prediction
-        pair_embeddings = torch.cat([user_emb, product_emb], dim=1)
+        # Normalize the embeddings
+        user_emb_norm = F.normalize(user_emb, p=2, dim=-1)
+        product_emb_norm = F.normalize(product_emb, p=2, dim=-1)
+        
+        # Compute element-wise dot product
+        dot_product = user_emb_norm * product_emb_norm
 
         # predict ratings
-        predictions = self.predictor(pair_embeddings).squeeze()
+        predictions = self.predictor(dot_product).squeeze()
 
         return predictions
-    
+
+class GNNRecommenderwithSkipConnections(nn.Module):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
+        super(GNNRecommenderwithSkipConnections, self).__init__()
+
+        # feature transformation layers
+        self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
+        self.product_feature_transform = nn.Linear(product_feature_dim, embedding_dim)
+
+        # GNN layers
+        self.conv1 = GCNConv(embedding_dim, embedding_dim)
+        self.bn1 = nn.BatchNorm1d(embedding_dim)  # Batch normalization layer
+        self.conv2 = GCNConv(embedding_dim, embedding_dim)
+        self.bn2 = nn.BatchNorm1d(embedding_dim)  # Batch normalization layer
+
+        # prediction layer
+        self.predictor = nn.Linear(embedding_dim, 1)
+
+    def forward(self, edge_index, user_features, product_features):
+
+        # Obtains raw user and product indices
+        user_indices = edge_index[0]
+        product_indices = edge_index[1] - user_features.shape[0]
+
+        # transform features
+        user_x = self.user_feature_transform(user_features)
+        product_x = self.product_feature_transform(product_features)
+
+        # combine user and product features
+        x = torch.cat([user_x, product_x], dim=0)
+
+        # combined edge index for message passing
+        combined_edge_index = torch.cat([
+            edge_index,
+            torch.stack([edge_index[1], edge_index[0]], dim=0)
+        ], dim=1)
+
+        # GNN layers
+        # Layer 1: Add skip connection from the input features
+        x1 = F.relu(self.bn1(self.conv1(x, combined_edge_index)))
+        x1 = F.dropout(x1, p=0.2, training=self.training)
+        x1 = x1 + x  # Skip connection from input
+
+        x2 = self.bn2(self.conv2(x1, combined_edge_index))
+        x2 = x2 + x1  # Skip connection from Layer 1
+
+        user_embeddings = x2[:len(user_x)]
+        product_embeddings = x2[len(user_x):]
+
+        # embeddings for the specific user-product pairs in edge_index
+        user_emb = user_embeddings[user_indices]
+        product_emb = product_embeddings[product_indices]
+
+        # Normalize the embeddings
+        user_emb_norm = F.normalize(user_emb, p=2, dim=-1)
+        product_emb_norm = F.normalize(product_emb, p=2, dim=-1)
+        
+        # Compute element-wise dot product
+        dot_product = user_emb_norm * product_emb_norm
+
+        # predict ratings
+        predictions = self.predictor(dot_product).squeeze()
+
+        return predictions
+
+
 # I used GNNSAGE because it's really fast!
 class GNNSAGERecommender(nn.Module):
     def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
@@ -126,7 +193,70 @@ class GNNSAGERecommender(nn.Module):
         predictions = self.predictor(pair_embeddings).squeeze()
 
         return predictions
-    
+
+class GNNSAGERecommenderwithSkipConnections(nn.Module):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
+        super(GNNSAGERecommenderwithSkipConnections, self).__init__()
+
+        # feature transformation layers
+        self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
+        self.product_feature_transform = nn.Linear(product_feature_dim, embedding_dim)
+
+        # GNN layers
+        self.conv1 = SAGEConv(embedding_dim, embedding_dim)
+        self.bn1 = nn.BatchNorm1d(embedding_dim)  # Batch normalization layer
+        self.conv2 = SAGEConv(embedding_dim, embedding_dim)
+        self.bn2 = nn.BatchNorm1d(embedding_dim)  # Batch normalization layer
+
+        # prediction layer
+        self.predictor = nn.Linear(embedding_dim, 1)
+
+    def forward(self, edge_index, user_features, product_features):
+
+        # Obtains raw user and product indices
+        user_indices = edge_index[0]
+        product_indices = edge_index[1] - user_features.shape[0]
+
+        # transform features
+        user_x = self.user_feature_transform(user_features)
+        product_x = self.product_feature_transform(product_features)
+
+        # combine user and product features
+        x = torch.cat([user_x, product_x], dim=0)
+
+        # combined edge index for message passing
+        combined_edge_index = torch.cat([
+            edge_index,
+            torch.stack([edge_index[1], edge_index[0]], dim=0)
+        ], dim=1)
+
+        # GNN layers
+        # Layer 1: Add skip connection from the input features
+        x1 = F.relu(self.bn1(self.conv1(x, combined_edge_index)))
+        x1 = F.dropout(x1, p=0.2, training=self.training)
+        x1 = x1 + x  # Skip connection from input
+
+        x2 = self.bn2(self.conv2(x1, combined_edge_index))
+        x2 = x2 + x1  # Skip connection from Layer 1
+
+        user_embeddings = x2[:len(user_x)]
+        product_embeddings = x2[len(user_x):]
+
+        # embeddings for the specific user-product pairs in edge_index
+        user_emb = user_embeddings[user_indices]
+        product_emb = product_embeddings[product_indices]
+
+        # Normalize the embeddings
+        user_emb_norm = F.normalize(user_emb, p=2, dim=-1)
+        product_emb_norm = F.normalize(product_emb, p=2, dim=-1)
+        
+        # Compute element-wise dot product
+        dot_product = user_emb_norm * product_emb_norm
+
+        # predict ratings
+        predictions = self.predictor(dot_product).squeeze()
+
+        return predictions
 
 class BaseGNNRecommender_v2(nn.Module):
     def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
