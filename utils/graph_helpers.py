@@ -1,9 +1,16 @@
 from torch.utils.data import DataLoader, TensorDataset
 
+import os
 import torch
 import torch.nn as nn
 
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.manifold import TSNE
+
+import pandas as pd
+import numpy as np
+import itertools
 
 import copy
 
@@ -117,6 +124,67 @@ def plot_loss(train_loss, validation_loss):
     
 #     return train_losses, valid_losses, best_model_state
 
+def plot_weights_heatmap_and_density(weights, attribute_key):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Heatmap (subplot 1)
+    sns.heatmap(weights, annot=False, cmap="viridis", ax=axes[0])
+    axes[0].set_title(f"Heatmap of {attribute_key}")
+    axes[0].set_xlabel("Input Features")
+    axes[0].set_ylabel("Output Features")
+
+    # Density plot (subplot 2)
+    sns.kdeplot(weights.flatten(), fill=True, color="blue", ax=axes[1])
+    axes[1].set_title(f"Density Plot of {attribute_key}")
+    axes[1].set_xlabel("Weight Value")
+    axes[1].set_ylabel("Density")
+
+    # Adjust layout and show the plot
+    plt.tight_layout()
+    plt.show()
+
+def plot_activation_heatmap_and_density(activations_of_interest):
+    # Create a figure with 2 subplots: one for the heatmap and one for the density plot
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    
+    # Heatmap (subplot 1)
+    sns.heatmap(activations_of_interest, vmin=-100, vmax=100, annot=False, cmap="viridis", ax=axes[0])
+    axes[0].set_title("Activations")
+    axes[0].set_xlabel("Features")
+    axes[0].set_ylabel("Users")
+    
+    # Density plot (subplot 2)
+    sns.kdeplot(activations_of_interest.flatten(), fill=True, color="blue", ax=axes[1])
+    axes[1].set_title("Density Plot")
+    axes[1].set_xlabel("Activations")
+    axes[1].set_ylabel("Density")
+    axes[1].set_xlim(-10000, 10000)
+    
+    # Adjust layout and show the plot
+    plt.tight_layout()
+    plt.show()
+
+def plot_actual_vs_predicted_ratings(test_predictions, test_edge_weights):
+    sns.kdeplot(test_predictions, color='blue', fill=True, label="Predicted")
+    sns.kdeplot(test_edge_weights, color="orange", fill=True, label="Actual")
+    
+    # Add labels and title
+    plt.title("Density Plot of Predicted and Actual Ratings")
+    plt.xlabel("Rating")
+    plt.ylabel("Density")
+    plt.legend()
+    
+    # Show the plot
+    plt.show()
+
+def plot_embedding_features(embedding_features):
+    plt.figure(figsize=(8, 6))
+    plt.scatter(embedding_features[:, 0], embedding_features[:, 1], alpha=0.5)
+    plt.title("t-SNE Visualization of Embedding Features (2D)")
+    plt.xlabel("t-SNE Component 1")
+    plt.ylabel("t-SNE Component 2")
+    plt.show()
+
 def train_model(model, train_edge_index, train_edge_weights, val_edge_index, val_edge_weights, user_features, product_features, 
                 num_epochs=100, lr=0.01, optimiser = None, device = None, print_progress = False):
     
@@ -181,7 +249,7 @@ def train_model(model, train_edge_index, train_edge_weights, val_edge_index, val
     
     return train_losses, valid_losses, best_model_state
 
-def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, best_state = None, device = None):
+def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, best_state = None, device = None, plot = False):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -196,7 +264,7 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
     with torch.no_grad():
         test_predictions = model(test_edge_index, user_features, product_features)
         test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
-        print(f"Test loss: {test_loss:.4f}")
+        metric_dict = {"Test loss": test_loss.item()}
 
     if best_state is not None:
         temp_state = model.state_dict()
@@ -204,4 +272,51 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
         best_test_predictions = model(test_edge_index, user_features, product_features)
         best_test_loss = nn.functional.mse_loss(best_test_predictions, test_edge_weights)
         model.load_state_dict(temp_state)
-        print(f"Best possible loss: {best_test_loss:.4f}")
+        metric_dict["Best possible loss"] = best_test_loss.item()
+        
+    if plot:
+        plot_actual_vs_predicted_ratings(test_predictions.numpy(), test_edge_weights.numpy())
+
+    return metric_dict
+
+def make_hyperparameters_grid(hyperparameters):
+    # Generate all combinations of hyperparameters
+    keys, values = zip(*hyperparameters.items())
+    combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+    
+    # Create a pandas DataFrame from the combinations
+    hyperparameters_df = pd.DataFrame(combinations)
+    
+    # Add additional columns with default values
+    hyperparameters_df["train_loss"] = np.nan
+    hyperparameters_df["train_loss"] = hyperparameters_df["train_loss"].astype('object')
+    hyperparameters_df["valid_loss"] = np.nan
+    hyperparameters_df["valid_loss"] = hyperparameters_df["valid_loss"].astype('object')
+    hyperparameters_df["test_loss"] = np.nan
+    hyperparameters_df["best_possible_loss"] = np.nan
+
+    return hyperparameters_df
+
+def grid_search_hyperparameters(hyperparameters_df, selected_model, num_users, num_products, user_feature_dim, product_feature_dim, train_edge_index, train_edge_weights, val_edge_index, val_edge_weights, 
+                                test_edge_index, test_edge_weights, user_features, product_features, device, save_interim=False):
+    
+    for index, row in hyperparameters_df.iterrows():
+        print(f"Running results for {index+1} out of {hyperparameters_df.shape[0]}...")
+        embedding_dim = int(row['embedding_dim'])
+        learning_rate = row['learning_rate']
+        num_epochs = int(row['num_epochs'])
+        model = selected_model(num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=embedding_dim)
+        optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+        model.to(device)
+        gnn_model_train_loss, gnn_model_valid_loss, best_gnn_model = train_model(model, train_edge_index, train_edge_weights, val_edge_index, val_edge_weights, 
+                                                         user_features, product_features, num_epochs = num_epochs, print_progress=False)
+        metric_dict = final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, best_gnn_model)
+        hyperparameters_df.at[index, 'train_loss'] = gnn_model_train_loss
+        hyperparameters_df.at[index, 'valid_loss'] = gnn_model_valid_loss
+        hyperparameters_df.loc[index, 'test_loss'] = metric_dict.get('Test loss')
+        hyperparameters_df.loc[index, 'best_possible_loss'] = metric_dict.get('Best possible loss')
+        if save_interim:
+            output_dir = "interim_output"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            hyperparameters_df.to_csv(f"{output_dir}/grid_search_results_{selected_model.__name__}.csv")

@@ -7,3 +7,4 @@ custom_blair/**/*
 # Data 
 data/
 ./data/
+interim_output/
