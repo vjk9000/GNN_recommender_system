@@ -2,21 +2,22 @@ from transformers import AutoModel, AutoTokenizer
 
 import torch
 
+
 # BLaIR embedding model on HuggingFace (roberta_base)
-def BLaIR_roberta_base_text_embedding_model(description_list, batch_size = 64, max_length = 512, device = None):
+def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max_length=512, device=None):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+
     # description_list = list(description_list.apply(lambda x: ' '.join(x))) # consider to drop
     tokenizer = AutoTokenizer.from_pretrained("hyp1231/blair-roberta-base")
     model = AutoModel.from_pretrained("hyp1231/blair-roberta-base")
-    
-    model.to(device) # move to gpu
+
+    model.to(device)  # move to gpu
     embeddings_list = []
 
     for i in range(0, len(description_list), batch_size):
         batch = description_list[i:i + batch_size]
-        inputs = tokenizer(batch, padding=True, truncation=True, max_length = max_length, return_tensors="pt")
+        inputs = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
         for key in inputs.keys():
             inputs[key] = inputs[key].to(device)
 
@@ -24,27 +25,28 @@ def BLaIR_roberta_base_text_embedding_model(description_list, batch_size = 64, m
             batch_embeddings = model(**inputs, return_dict=True).last_hidden_state[:, 0]
             batch_embeddings = batch_embeddings / batch_embeddings.norm(dim=1, keepdim=True)
 
-        embeddings_list.append(batch_embeddings.cpu()) 
+        embeddings_list.append(batch_embeddings.cpu())
 
     embeddings = torch.cat(embeddings_list, dim=0)
     return embeddings
 
-# custom blair embedding model 
+
+# custom blair embedding model
 # difference in the way outputs are taken? 
-def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size = 64, max_length = 512, device = None):
+def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64, max_length=512, device=None):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+
     # description_list = list(description_list.apply(lambda x: ' '.join(x))) # consider to drop
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
     model = AutoModel.from_pretrained(model_dir)
-    
-    model.to(device) # move to gpu
+
+    model.to(device)  # move to gpu
     embeddings_list = []
 
     for i in range(0, len(description_list), batch_size):
         batch = description_list[i:i + batch_size]
-        inputs = tokenizer(batch, padding=True, truncation=True, max_length = max_length, return_tensors="pt")
+        inputs = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
         for key in inputs.keys():
             inputs[key] = inputs[key].to(device)
 
@@ -52,16 +54,43 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size = 
             batch_outputs = model(**inputs)
             batch_embeddings = batch_outputs.last_hidden_state[:, 0, :]
 
-        embeddings_list.append(batch_embeddings.cpu()) 
+        embeddings_list.append(batch_embeddings.cpu())
 
     embeddings = torch.cat(embeddings_list, dim=0)
     return embeddings
 
 
-def instantiate_users(arg_1, arg_2 = None):
+def e5_embedding_model(description_list, model_dir, batch_size=64, max_length=512, device=None):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # description_list = list(description_list.apply(lambda x: ' '.join(x))) # consider to drop
+    tokenizer = AutoTokenizer.from_pretrained("intfloat/e5-small-v2")
+    model = AutoModel.from_pretrained("intfloat/e5-small-v2")
+
+    model.to(device)  # move to gpu
+    embeddings_list = []
+
+    for i in range(0, len(description_list), batch_size):
+        batch = description_list[i:i + batch_size]
+        inputs = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
+        for key in inputs.keys():
+            inputs[key] = inputs[key].to(device)
+
+        with torch.no_grad():
+            batch_outputs = model(**inputs)
+            batch_embeddings = batch_outputs.last_hidden_state[:, 0, :]
+
+        embeddings_list.append(batch_embeddings.cpu())
+
+    embeddings = torch.cat(embeddings_list, dim=0)
+    return embeddings
+
+
+def instantiate_users(arg_1, arg_2=None):
     # Either pass in two number for the user nodes (num user, num features) 
     # Or pass in a df of the user_id to the required features 
     if type(arg_1) == int:
-        return torch.zeros((arg_1, arg_2), dtype=torch.float) 
-    t1 = torch.tensor(arg_1.drop(["user_id", "reviews"], axis = 1).to_numpy(), dtype = torch.float) 
+        return torch.zeros((arg_1, arg_2), dtype=torch.float)
+    t1 = torch.tensor(arg_1.drop(["user_id", "reviews"], axis=1).to_numpy(), dtype=torch.float)
     return torch.cat([t1, arg_2], dim=1)
