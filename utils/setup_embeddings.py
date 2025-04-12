@@ -4,7 +4,8 @@ import torch
 
 
 # BLaIR embedding model on HuggingFace (roberta_base)
-def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max_length=512, device=None):
+def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max_length=512, device=None,
+                                            pooling='cls'):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -22,7 +23,22 @@ def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max
             inputs[key] = inputs[key].to(device)
 
         with torch.no_grad():
-            batch_embeddings = model(**inputs, return_dict=True).last_hidden_state[:, 0]
+            last_hidden_state = model(**inputs, return_dict=True).last_hidden_state
+            attention_mask = inputs["attention_mask"]
+            # resize mask to hidden state size
+            mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size())
+
+            if pooling == "cls":
+                batch_embeddings = last_hidden_state[:, 0]
+            if pooling == "mean":
+                sum_hidden = torch.sum(last_hidden_state * mask_expanded, 1)
+                sum_mask = mask_expanded.sum(1)
+                batch_embeddings = sum_hidden / sum_mask.clamp(min=1e-9)
+            if pooling == "max":
+                last_hidden_state[mask_expanded == 0] = float('-inf')
+                batch_embeddings, _ = last_hidden_state.max(dim=1)
+
+            # normalize
             batch_embeddings = batch_embeddings / batch_embeddings.norm(dim=1, keepdim=True)
 
         embeddings_list.append(batch_embeddings.cpu())
@@ -33,7 +49,9 @@ def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max
 
 # custom blair embedding model
 # difference in the way outputs are taken? 
-def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64, max_length=512, device=None):
+def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64, max_length=512, device=None,
+                                      pooling='cls'):
+
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -51,8 +69,19 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64
             inputs[key] = inputs[key].to(device)
 
         with torch.no_grad():
-            batch_outputs = model(**inputs)
-            batch_embeddings = batch_outputs.last_hidden_state[:, 0, :]
+            last_hidden_state = model(**inputs).last_hidden_state
+            attention_mask = inputs["attention_mask"]
+            mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size())
+
+            if pooling == "cls":
+                batch_embeddings = last_hidden_state[:, 0, :]
+            if pooling == "mean":
+                sum_hidden = torch.sum(last_hidden_state * mask_expanded, 1)
+                sum_mask = mask_expanded.sum(1)
+                batch_embeddings = sum_hidden / sum_mask.clamp(min=1e-9)
+            if pooling == "max":
+                last_hidden_state[mask_expanded == 0] = float('-inf')
+                batch_embeddings, _ = last_hidden_state.max(dim=1)
 
         embeddings_list.append(batch_embeddings.cpu())
 
@@ -60,7 +89,7 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64
     return embeddings
 
 
-def e5_embedding_model(description_list, model_dir, batch_size=64, max_length=512, device=None):
+def e5_embedding_model(description_list, batch_size=64, max_length=512, device=None, pooling="cls"):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -70,6 +99,7 @@ def e5_embedding_model(description_list, model_dir, batch_size=64, max_length=51
 
     model.to(device)  # move to gpu
     embeddings_list = []
+    description_list = ("passage: " + description_list.astype(str)).tolist()
 
     for i in range(0, len(description_list), batch_size):
         batch = description_list[i:i + batch_size]
@@ -78,12 +108,24 @@ def e5_embedding_model(description_list, model_dir, batch_size=64, max_length=51
             inputs[key] = inputs[key].to(device)
 
         with torch.no_grad():
-            batch_outputs = model(**inputs)
-            batch_embeddings = batch_outputs.last_hidden_state[:, 0, :]
+            last_hidden_state = model(**inputs).last_hidden_state
+            attention_mask = inputs["attention_mask"]
+            mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size())
+
+            if pooling == "cls":
+                batch_embeddings = last_hidden_state[:, 0, :]
+            if pooling == "mean":
+                sum_hidden = torch.sum(last_hidden_state * mask_expanded, 1)
+                sum_mask = mask_expanded.sum(1)
+                batch_embeddings = sum_hidden / sum_mask.clamp(min=1e-9)
+            if pooling == "max":
+                last_hidden_state[mask_expanded == 0] = float('-inf')
+                batch_embeddings, _ = last_hidden_state.max(dim=1)
 
         embeddings_list.append(batch_embeddings.cpu())
 
     embeddings = torch.cat(embeddings_list, dim=0)
+
     return embeddings
 
 
