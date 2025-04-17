@@ -153,7 +153,7 @@ def train_model(model, train_edge_index, train_edge_weights, val_edge_index, val
         # forward pass
         train_predictions = model(train_edge_index, user_features, product_features)
 
-        # MSE 
+        # MSE
         train_loss = nn.functional.mse_loss(train_predictions, train_edge_weights)
 
         # backward pass and optimisation
@@ -205,3 +205,13 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
         best_test_loss = nn.functional.mse_loss(best_test_predictions, test_edge_weights)
         model.load_state_dict(temp_state)
         print(f"Best possible loss: {best_test_loss:.4f}")
+
+    return test_loss
+
+def plot_embedding_features(embedding_features):
+    plt.figure(figsize=(8, 6))
+    plt.scatter(embedding_features[:, 0], embedding_features[:, 1], alpha=0.5)
+    plt.title("t-SNE Visualization of Embedding Features (2D)")
+    plt.xlabel("t-SNE Component 1")
+    plt.ylabel("t-SNE Component 2")
+    plt.show()
