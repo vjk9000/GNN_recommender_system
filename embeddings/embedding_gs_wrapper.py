@@ -26,6 +26,10 @@ class EmbeddingAndGNNWrapper:
         self.user_features = None
         self.product_features = None
 
+        self.train_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/train_edges.parquet")
+        self.test_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/test_edges.parquet")
+        self.val_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/val_edges.parquet")
+
         self.user_id_to_idx = pickle.load(open(f"{CLEANED_DATA_PATH}/user_id_to_idx.pkl", "rb"))
         self.prod_id_to_idx = pickle.load(open(f"{CLEANED_DATA_PATH}/prod_id_to_idx.pkl", "rb"))
 
@@ -33,6 +37,7 @@ class EmbeddingAndGNNWrapper:
         (user_features_numeric_agg, user_features_string_agg,
          product_features_numeric, product_features_string,
          ) = X
+        print('Embedding product meta and user reviews...')
         product_meta_embeddings, user_reviews_embeddings = self._embed(product_features_string,
                                                                        user_features_string_agg,
                                                                        self.embedding_model_name, self.pooling,
@@ -49,30 +54,6 @@ class EmbeddingAndGNNWrapper:
         product_feature_dim = self.product_features.shape[1]
         embedding_size = product_meta_embeddings.shape[1]
 
-        reviews_dataset = load_dataset("McAuley-Lab/Amazon-Reviews-2023", "raw_review_All_Beauty",
-                                       trust_remote_code=True)
-
-        valid_user_ids = set(user_features_string_agg["user_id"])
-        valid_product_ids = set(product_features_string["parent_asin"])
-
-        review_df = reviews_dataset['full'].to_pandas()
-        review_df = review_df.drop_duplicates(subset=["user_id", "parent_asin"])
-
-        edge_df = review_df[["user_id", "parent_asin", "rating", "timestamp"]].copy()
-
-        user_id_to_idx = {unique_id: idx for idx, unique_id in enumerate(sorted(valid_user_ids))}
-        prod_id_to_idx = {unique_id: idx for idx, unique_id in enumerate(sorted(valid_product_ids))}
-
-        edge_df["user_idx"] = edge_df.user_id.map(user_id_to_idx)
-        edge_df["prod_idx"] = edge_df.parent_asin.map(prod_id_to_idx)
-        edge_df = edge_df[~(edge_df['user_id'].isna() & edge_df['parent_asin'].isna())]
-
-        train_mark = np.quantile(edge_df.timestamp, 0.7)
-        test_mark = np.quantile(edge_df.timestamp, 0.85)
-        self.train_edges = edge_df[edge_df.timestamp <= train_mark].copy()
-        self.test_edges = edge_df[edge_df.timestamp >= test_mark].copy()
-        self.val_edges = edge_df[(edge_df.timestamp > train_mark) & (edge_df.timestamp < test_mark)].copy()
-
         train_edge_index = torch.tensor(self.train_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
         val_edge_index = torch.tensor(self.val_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
         self.test_edge_index = torch.tensor(self.test_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
@@ -81,11 +62,17 @@ class EmbeddingAndGNNWrapper:
         val_edge_weights = torch.tensor(self.val_edges.rating.to_list(), dtype=torch.float)
         self.test_edge_weights = torch.tensor(self.test_edges.rating.to_list(), dtype=torch.float)
 
+        # train_edge_index = train_edge_index.to(self.device)
+        # train_edge_weights = train_edge_weights.to(self.device)
+        # val_edge_index = val_edge_index.to(self.device)
+        # val_edge_weights = val_edge_weights.to(self.device)
+        # self.user_features = self.user_features.to(self.device)
+        # self.product_features = self.product_features.to(self.device)
+
         self.base_gnn_model = BaseGNNRecommender(num_users, num_products, user_feature_dim, product_feature_dim,
                                                  embedding_size, custom_embedding=True).to(self.device)
         optimizer = torch.optim.Adam(self.base_gnn_model.parameters(), lr=0.01)
 
-        print(train_edge_weights, 'trainedgeweights in wrapper')
         print("Training model now...")
 
         train_loss, valid_loss, self.best_model = train_model(
