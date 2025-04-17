@@ -4,6 +4,8 @@
 # Blair models
 custom_blair/**/*
 
-
 # Data 
 data/
+
+# Others 
+others/

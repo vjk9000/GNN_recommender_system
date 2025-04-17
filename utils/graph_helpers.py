@@ -1,0 +1,95 @@
+import copy
+import matplotlib.pyplot as plt
+import torch
+import torch.nn as nn
+
+from utils.setup_nodes import combine_edges
+
+def plot_train_val_loss(train_loss, validation_loss, figsize = (6.5, 3.4), xlabel = "Epoch", ylabel = "Loss", 
+                        title = 'Training and Validation Loss', grid = True):
+    plt.figure(figsize=figsize)
+    plt.plot(range(len(train_loss)), train_loss, label='Training Loss')
+    plt.plot(range(len(validation_loss)), validation_loss, label='Validation Loss')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.grid(grid)
+    plt.show()
+    return None
+
+def train_model(model, train_edge_index, train_edge_weights, test_edge_index, test_edge_weights, user_features, product_features, 
+                num_epochs=100, lr=0.01, optimiser = None, device = None, print_progress = False, print_freq = 10):
+    
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    if optimiser is None:
+        optimiser = torch.optim.Adam(model.parameters(), lr=lr)
+    
+    # lists to store loss values for plotting
+    train_losses = []
+    test_losses = []
+
+    # Hold for the best config 
+    best_model_state = model.state_dict()
+    best_valid_loss = float("inf")
+    best_model_epoch = None
+
+    # Make the combined edges 
+    train_combined_egde_index = combine_edges(train_edge_index)
+    test_combined_egde_index = combine_edges(test_edge_index)
+    train_combined_egde_index = train_combined_egde_index.to(device)
+    test_combined_egde_index = test_combined_egde_index.to(device)
+
+    # training loop across epochs
+    for epoch in range(1, num_epochs + 1):
+        # training
+        model.train()
+        optimiser.zero_grad()
+
+        # forward pass
+        train_predictions = model(train_edge_index, train_combined_egde_index, user_features, product_features)
+
+        # MSE 
+        train_loss = nn.functional.mse_loss(train_predictions, train_edge_weights)
+
+        # backward pass and optimisation
+        train_loss.backward()
+        optimiser.step()
+        
+        # training complete move to validation 
+        model.eval()
+        with torch.no_grad():
+            valid_predictions = model(test_edge_index, test_combined_egde_index, user_features, product_features)
+            valid_loss = nn.functional.mse_loss(valid_predictions, test_edge_weights)
+    
+        # Append losses 
+        train_losses.append(train_loss.item())
+        test_losses.append(valid_loss.item())
+
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            best_model_state = copy.deepcopy(model.state_dict())
+            best_model_epoch = epoch
+
+        # print progress
+        if epoch % print_freq == 0 and print_progress:
+            print(f'Epoch: {epoch}, Train Loss: {train_loss:.4f}, Val Loss: {valid_loss:.4f}, best model epoch: {best_model_epoch}')
+    
+    return train_losses, test_losses, best_model_state
+
+def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, device = None):
+    if device is None:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Make the combined edges 
+    test_combined_egde_index = combine_edges(test_edge_index)
+    test_combined_egde_index = test_combined_egde_index.to(device)
+
+    # Final evaluation on test set
+    model.eval()
+    with torch.no_grad():
+        test_predictions = model(test_edge_index, test_combined_egde_index, user_features, product_features)
+        test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
+        print(f"Test loss: {test_loss:.4f}")
