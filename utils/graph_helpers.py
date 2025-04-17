@@ -208,10 +208,14 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
 
     return test_loss
 
-def plot_embedding_features(embedding_features):
+def plot_embedding_features(embedding_features, save=False, name=None):
     plt.figure(figsize=(8, 6))
     plt.scatter(embedding_features[:, 0], embedding_features[:, 1], alpha=0.5)
     plt.title("t-SNE Visualization of Embedding Features (2D)")
     plt.xlabel("t-SNE Component 1")
     plt.ylabel("t-SNE Component 2")
-    plt.show()
+
+    if save:
+        plt.savefig(f'../gridsearch_embeddings/{name}.png')
+    else:
+        plt.show()
