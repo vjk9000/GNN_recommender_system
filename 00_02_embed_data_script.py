@@ -13,11 +13,11 @@ three_split = "train_test_valid_split"
 product_df = pd.read_parquet("data/full_data/product_df.parquet")
 
 # Aggregated users 
-two_split_review_train_agg = pd.read_parquet(f"data/train_test_split/two_split_review_train_agg.parquet")
-two_split_review_test_agg = pd.read_parquet(f"data/train_test_split/two_split_review_test_agg.parquet")
-three_split_review_train_agg = pd.read_parquet(f"data/train_test_valid_split/three_split_review_train_agg.parquet")
-three_split_review_test_agg = pd.read_parquet(f"data/train_test_valid_split/three_split_review_test_agg.parquet")
-three_split_review_valid_agg = pd.read_parquet(f"data/train_test_valid_split/three_split_review_valid_agg.parquet")
+two_split_review_train_agg = pd.read_parquet(f"data/train_test_split/train_agg.parquet")
+two_split_review_test_agg = pd.read_parquet(f"data/train_test_split/test_agg.parquet")
+three_split_review_train_agg = pd.read_parquet(f"data/train_test_valid_split/train_agg.parquet")
+three_split_review_test_agg = pd.read_parquet(f"data/train_test_valid_split/test_agg.parquet")
+three_split_review_valid_agg = pd.read_parquet(f"data/train_test_valid_split/valid_agg.parquet")
 
 # Define
 
