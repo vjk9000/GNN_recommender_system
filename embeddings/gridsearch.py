@@ -77,10 +77,10 @@ def gs_embeddings():
     product_features_numeric = pd.read_parquet(f"{CLEANED_DATA_PATH}/product_features_numeric.parquet")
     product_features_string = pd.read_parquet(f"{CLEANED_DATA_PATH}/product_features_string.parquet")
 
-    user_features_string_agg = user_features_string_agg.iloc[0:5]
-    user_features_numeric_agg = user_features_numeric_agg.iloc[0:5]
-    product_features_string = product_features_string.iloc[0:5]
-    product_features_numeric = product_features_numeric.iloc[0:5]
+    user_features_string_agg = user_features_string_agg
+    user_features_numeric_agg = user_features_numeric_agg
+    product_features_string = product_features_string
+    product_features_numeric = product_features_numeric
 
     X_custom = (
         user_features_numeric_agg,
@@ -93,7 +93,7 @@ def gs_embeddings():
     param_grid = {
         "pooling": ["cls"],
         "max_length": [2],
-        "embedding_model_name": ["E5"]
+        "embedding_model_name": ["E5",]
     }
 
     results = custom_grid_search(
