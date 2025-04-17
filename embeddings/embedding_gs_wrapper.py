@@ -3,8 +3,8 @@ import pickle
 import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin
 import torch
-import numpy as np
 
+from embeddings.constants import CLEANED_DATA_PATH
 from utils.graph_helpers import train_model, plot_loss, final_evaluation
 from utils.graph_model import BaseGNNRecommender
 from utils.setup_embeddings import e5_embedding_model, custom_BLaIR_text_embedding_model, \
@@ -12,9 +12,8 @@ from utils.setup_embeddings import e5_embedding_model, custom_BLaIR_text_embeddi
 
 
 # change the parent class later
-class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
-    def __init__(self, embedding_model_name="intfloat/e5-small-v2", pooling="cls", batch_size=64, max_length=512, device=None,
-                 edges=None):
+class EmbeddingAndGNNWrapper:
+    def __init__(self, embedding_model_name="intfloat/e5-small-v2", pooling="mean", batch_size=64, max_length=512, device=None):
         self.embedding_model_name = embedding_model_name
         self.pooling = pooling
         self.batch_size = batch_size
@@ -25,18 +24,19 @@ class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
         self.user_features = None
         self.product_features = None
 
-        self.user_id_to_idx = pickle.load(open("cleaned_v2/user_id_to_idx.pkl", "rb"))
-        self.prod_id_to_idx = pickle.load(open("cleaned_v2/prod_id_to_idx.pkl", "rb"))
+        self.train_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/train_edges.parquet")
+        self.test_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/test_edges.parquet")
+        self.val_edges = pd.read_parquet(f"{CLEANED_DATA_PATH}/val_edges.parquet")
 
-        # TODO: see if need later
-        self.embedding_size = 64
+        self.user_id_to_idx = pickle.load(open(f"{CLEANED_DATA_PATH}/user_id_to_idx.pkl", "rb"))
+        self.prod_id_to_idx = pickle.load(open(f"{CLEANED_DATA_PATH}/prod_id_to_idx.pkl", "rb"))
+
 
     def fit(self, X, y=None):
-        (user_features_numeric_agg, user_features_string_agg, product_features_numeric,
-        product_features_string, train_edges, test_edges, val_edges) = X
-
-        # TODO: pass in embedding model name, pooling, max length for GS
-
+        (user_features_numeric_agg, user_features_string_agg,
+         product_features_numeric, product_features_string,
+         ) = X
+        print(self.embedding_model_name)
         product_meta_embeddings, user_reviews_embeddings = self._embed(product_features_string, user_features_string_agg,
                                                                        self.embedding_model_name, self.pooling, self.max_length)
 
@@ -47,16 +47,20 @@ class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
         num_products = len(self.prod_id_to_idx)
         user_feature_dim = self.user_features.shape[1]
         product_feature_dim = self.product_features.shape[1]
+        embedding_size = product_meta_embeddings.shape[1]
 
-        train_edge_index = torch.tensor(train_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
-        val_edge_index = torch.tensor(val_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
-        self.test_edge_index = torch.tensor(test_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)
+        train_edge_index = torch.tensor(self.train_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)[0:5]
+        val_edge_index = torch.tensor(self.val_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)[0:5]
+        self.test_edge_index = torch.tensor(self.test_edges[["user_idx", "prod_idx"]].to_numpy().T, dtype=torch.long)[0:5]
 
-        train_edge_weights = torch.tensor(train_edges.rating.to_list(), dtype=torch.float)
-        val_edge_weights = torch.tensor(val_edges.rating.to_list(), dtype=torch.float)
-        self.test_edge_weights = torch.tensor(test_edges.rating.to_list(), dtype=torch.float)
+        train_edge_weights = torch.tensor(self.train_edges.rating.to_list(), dtype=torch.float)[0:5]
+        val_edge_weights = torch.tensor(self.val_edges.rating.to_list(), dtype=torch.float)[0:5]
+        self.test_edge_weights = torch.tensor(self.test_edges.rating.to_list(), dtype=torch.float)[0:5]
 
-        self.base_gnn_model = BaseGNNRecommender(num_users, num_products, user_feature_dim,product_feature_dim).to(self.device)
+        print(product_feature_dim, 'product feature dim')
+        print(embedding_size, 'embedding size')
+        print(train_edge_weights.shape, 'train edge weights dim')
+        self.base_gnn_model = BaseGNNRecommender(num_users, num_products, user_feature_dim, product_feature_dim, embedding_size, custom_embedding=True).to(self.device)
         optimizer = torch.optim.Adam(self.base_gnn_model.parameters(), lr=0.01)
 
         train_loss, valid_loss, self.best_model = train_model(
@@ -72,6 +76,7 @@ class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
 
         # use if passing in true y
         # self.y_true_ = y_true
+
         return self
 
     def score(self, X=None, y=None):
@@ -83,8 +88,9 @@ class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
                embedding_model_name, pooling, max_length):
 
         product_meta_features, user_review_features = None, None
-
+        print('embedding model name in _embed', embedding_model_name)
         if embedding_model_name == 'E5':
+            print('in e5')
             # TODO: meta col + 1/2 of other cols
             product_meta_features = e5_embedding_model(product_features_string["meta"], batch_size=64,
                                                        max_length=max_length, pooling=pooling)
@@ -92,17 +98,15 @@ class EmbeddingAndGNNWrapper(BaseEstimator, RegressorMixin):
             user_review_features = e5_embedding_model(user_features_string_agg["reviews"], batch_size=64,
                                                       max_length=max_length, pooling=pooling)
             torch.save(user_review_features, f"./e5_user_rev_{pooling}_{max_length}.pt")
-
-        if embedding_model_name == 'roberta-massive':
+        elif embedding_model_name == 'roberta-massive':
             product_meta_features = custom_BLaIR_text_embedding_model(product_features_string["meta"],
-                                                                      "./embeddings/blair-roberta-base_massive",
+                                                                      "blair-roberta-base_massive",
                                                                       batch_size=64, max_length=max_length, pooling=pooling),
             torch.save(product_meta_features, f"./customblair_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = custom_BLaIR_text_embedding_model(user_features_string_agg["reviews"],
-                                                      "./embeddings/blair-roberta-base_massive",
-                                                      batch_size=64, max_length=max_length, pooling=pooling)
+                                                                     "blair-roberta-base_massive",
+                                                                     batch_size=64, max_length=max_length, pooling=pooling)
             torch.save(user_review_features, f"./customblair_user_rev_{pooling}_{max_length}.pt")
-
         else:
             # use default blair
             product_meta_features = BLaIR_roberta_base_text_embedding_model(product_features_string["meta"],
