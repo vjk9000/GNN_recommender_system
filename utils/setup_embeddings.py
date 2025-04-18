@@ -17,7 +17,7 @@ def BLaIR_roberta_base_text_embedding_model(description_list, batch_size=64, max
     embeddings_list = []
 
     for i in range(0, len(description_list), batch_size):
-        batch = description_list[i:i + batch_size]
+        batch = description_list[i:i + batch_size].tolist()
         inputs = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
         for key in inputs.keys():
             inputs[key] = inputs[key].to(device)
@@ -63,7 +63,7 @@ def custom_BLaIR_text_embedding_model(description_list, model_dir, batch_size=64
     embeddings_list = []
 
     for i in range(0, len(description_list), batch_size):
-        batch = description_list[i:i + batch_size]
+        batch = description_list[i:i + batch_size].tolist()
         inputs = tokenizer(batch, padding=True, truncation=True, max_length=max_length, return_tensors="pt")
         for key in inputs.keys():
             inputs[key] = inputs[key].to(device)
