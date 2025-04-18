@@ -9,11 +9,7 @@ from embeddings.embedding_gs_wrapper import EmbeddingAndGNNWrapper
 
 
 def custom_grid_search(model_class, param_grid, data_tuple, verbose=1):
-    # just to tidy up embedding_model_name that will be saved, if not E5 or custom blair
-    accepted_models = (["E5"], ["custom-blair"])
-    if param_grid['embedding_model_name'] not in accepted_models:
-        param_grid['embedding_model_name'] = ['default-blair']
-
+    accepted_models = ["E5", "custom-blair"]
     param_names = list(param_grid.keys())
     param_values = list(param_grid.values())
 
@@ -29,6 +25,10 @@ def custom_grid_search(model_class, param_grid, data_tuple, verbose=1):
         print(f"Starting grid search with {total_combinations} combinations")
 
     for i, values in enumerate(param_combinations):
+        # just to tidy up embedding_model_name that will be saved if not using E5 or custom blair
+        # values is a tuple of (pooling, max_length, model_name)
+        if values[2] not in accepted_models:
+            values = (values[0], values[1], 'default-blair')
         params = dict(zip(param_names, values))
 
         if verbose > 0:
@@ -93,7 +93,7 @@ def gs_embeddings():
     param_grid = {
         "pooling": ["cls", "mean", "max"],
         "max_length": [10, 200, 512],
-        "embedding_model_name": ["E5", "custom-blair", "default-blair"]
+        "embedding_model_name": ["E5", "default-blair", "custom-blair"]
     }
 
     results = custom_grid_search(
