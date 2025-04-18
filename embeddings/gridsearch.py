@@ -91,9 +91,9 @@ def gs_embeddings():
 
     # will be passed into init of wrapper
     param_grid = {
-        "pooling": ["cls", "mean", "max"],
-        "max_length": [10, 200, 512],
-        "embedding_model_name": ["E5", "default-blair", "custom-blair"]
+        "pooling": ["cls"],
+        "max_length": [10],
+        "embedding_model_name": ["E5", "default-blair"]
     }
 
     results = custom_grid_search(

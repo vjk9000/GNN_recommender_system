@@ -105,11 +105,12 @@ class EmbeddingAndGNNWrapper:
 
         product_meta_features, user_review_features = None, None
         pdt_meta_emb_path = f"./{embedding_model_name}_pdt_meta_{pooling}_{max_length}.pt"
+        user_rev_emb_path = f"./{embedding_model_name}_user_rev_{pooling}_{max_length}.pt"
 
-        if os.path.exists(pdt_meta_emb_path):
+        if os.path.exists(pdt_meta_emb_path) and os.path.exists(user_rev_emb_path):
             product_meta_features = torch.load(pdt_meta_emb_path)
-            user_review_features = torch.load(
-                f"./{embedding_model_name}_user_rev_{pooling}_{max_length}.pt")
+            user_review_features = torch.load(user_rev_emb_path)
+
             product_meta_features = product_meta_features.to(self.device)
             user_review_features = user_review_features.to(self.device)
             return product_meta_features, user_review_features
