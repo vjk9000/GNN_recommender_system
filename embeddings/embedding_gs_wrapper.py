@@ -1,3 +1,4 @@
+import os
 import pickle
 
 import numpy as np
@@ -6,7 +7,7 @@ from datasets import load_dataset
 import torch
 from sklearn.manifold import TSNE
 
-from embeddings.constants import CLEANED_DATA_PATH
+from embeddings.constants import CLEANED_DATA_PATH, BLAIR_MODEL_PATH
 from utils.graph_helpers import train_model, plot_loss, final_evaluation, plot_embedding_features
 from utils.graph_model import BaseGNNRecommender
 from utils.setup_embeddings import e5_embedding_model, custom_BLaIR_text_embedding_model, \
@@ -103,40 +104,49 @@ class EmbeddingAndGNNWrapper:
                embedding_model_name, pooling, max_length):
 
         product_meta_features, user_review_features = None, None
-        # print('embedding model name in _embed', embedding_model_name)
+        pdt_meta_emb_path = f"./{embedding_model_name}_pdt_meta_{pooling}_{max_length}.pt"
+
+        if os.path.exists(pdt_meta_emb_path):
+            product_meta_features = torch.load(pdt_meta_emb_path)
+            user_review_features = torch.load(
+                f"./{embedding_model_name}_user_rev_{pooling}_{max_length}.pt")
+            product_meta_features = product_meta_features.to(self.device)
+            user_review_features = user_review_features.to(self.device)
+            return product_meta_features, user_review_features
+
         if embedding_model_name == 'E5':
             # TODO: meta col + 1/2 of other cols
             product_meta_features = e5_embedding_model(product_features_string["meta"], batch_size=64,
                                                        max_length=max_length, pooling=pooling)
-            torch.save(product_meta_features, f"./e5_pdt_meta_{pooling}_{max_length}.pt")
+            torch.save(product_meta_features, f"./E5_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = e5_embedding_model(user_features_string_agg["reviews"], batch_size=64,
                                                       max_length=max_length, pooling=pooling)
-            torch.save(user_review_features, f"./e5_user_rev_{pooling}_{max_length}.pt")
+            torch.save(user_review_features, f"./E5_user_rev_{pooling}_{max_length}.pt")
         elif embedding_model_name == 'custom-blair':
             product_meta_features = custom_BLaIR_text_embedding_model(product_features_string["meta"],
-                                                                      "blair-roberta-base_massive",
+                                                                      BLAIR_MODEL_PATH,
                                                                       batch_size=64, max_length=max_length,
                                                                       pooling=pooling)
-            torch.save(product_meta_features, f"./customblair_pdt_meta_{pooling}_{max_length}.pt")
+            torch.save(product_meta_features, f"./custom-blair_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = custom_BLaIR_text_embedding_model(user_features_string_agg["reviews"],
-                                                                     "blair-roberta-base_massive",
+                                                                     BLAIR_MODEL_PATH,
                                                                      batch_size=64, max_length=max_length,
                                                                      pooling=pooling)
-            torch.save(user_review_features, f"./customblair_user_rev_{pooling}_{max_length}.pt")
+            torch.save(user_review_features, f"./custom-blair_user_rev_{pooling}_{max_length}.pt")
         else:
             # use default blair
             product_meta_features = BLaIR_roberta_base_text_embedding_model(product_features_string["meta"],
                                                                             batch_size=64, max_length=max_length,
                                                                             pooling=pooling)
-            torch.save(product_meta_features, f"./blairbase_pdt_meta_{pooling}_{max_length}.pt")
+            torch.save(product_meta_features, f"./default-blair_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = BLaIR_roberta_base_text_embedding_model(user_features_string_agg["reviews"],
                                                                            batch_size=64, max_length=max_length,
                                                                            pooling=pooling)
-            torch.save(user_review_features, f"./blairbase_user_rev_{pooling}_{max_length}.pt")
+            torch.save(user_review_features, f"./default-blair_user_rev_{pooling}_{max_length}.pt")
 
         product_meta_features = product_meta_features.to(self.device)
         user_review_features = user_review_features.to(self.device)
-
+        print('hokay')
         return product_meta_features, user_review_features
 
     def _prepare_combined_features(self, product_meta_features, user_review_features, product_features_numeric,
