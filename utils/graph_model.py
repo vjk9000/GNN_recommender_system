@@ -16,11 +16,6 @@ class BaseGNNRecommender(nn.Module):
         self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
         self.product_feature_transform = nn.Linear(product_feature_dim, embedding_dim)
 
-        if custom_embedding:
-            # pass in the combined numeric and embedded string features.
-            self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
-            self.product_feature_transform = nn.Linear(product_feature_dim, embedding_dim)
-
         # GNN layers
         self.conv1 = GCNConv(embedding_dim, embedding_dim)
         self.conv2 = GCNConv(embedding_dim, embedding_dim)
