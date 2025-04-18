@@ -9,6 +9,11 @@ from embeddings.embedding_gs_wrapper import EmbeddingAndGNNWrapper
 
 
 def custom_grid_search(model_class, param_grid, data_tuple, verbose=1):
+    # just to tidy up embedding_model_name that will be saved, if not E5 or custom blair
+    accepted_models = (["E5"], ["custom-blair"])
+    if param_grid['embedding_model_name'] not in accepted_models:
+        param_grid['embedding_model_name'] = ['default-blair']
+
     param_names = list(param_grid.keys())
     param_values = list(param_grid.values())
 
@@ -77,11 +82,6 @@ def gs_embeddings():
     product_features_numeric = pd.read_parquet(f"{CLEANED_DATA_PATH}/product_features_numeric.parquet")
     product_features_string = pd.read_parquet(f"{CLEANED_DATA_PATH}/product_features_string.parquet")
 
-    user_features_string_agg = user_features_string_agg
-    user_features_numeric_agg = user_features_numeric_agg
-    product_features_string = product_features_string
-    product_features_numeric = product_features_numeric
-
     X_custom = (
         user_features_numeric_agg,
         user_features_string_agg,
@@ -91,9 +91,9 @@ def gs_embeddings():
 
     # will be passed into init of wrapper
     param_grid = {
-        "pooling": ["cls"],
-        "max_length": [2],
-        "embedding_model_name": ["E5",]
+        "pooling": ["cls", "mean", "max"],
+        "max_length": [10, 200, 512],
+        "embedding_model_name": ["E5", "custom-blair", "default-blair"]
     }
 
     results = custom_grid_search(

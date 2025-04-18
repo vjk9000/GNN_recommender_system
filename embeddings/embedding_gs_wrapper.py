@@ -62,12 +62,12 @@ class EmbeddingAndGNNWrapper:
         val_edge_weights = torch.tensor(self.val_edges.rating.to_list(), dtype=torch.float)
         self.test_edge_weights = torch.tensor(self.test_edges.rating.to_list(), dtype=torch.float)
 
-        # train_edge_index = train_edge_index.to(self.device)
-        # train_edge_weights = train_edge_weights.to(self.device)
-        # val_edge_index = val_edge_index.to(self.device)
-        # val_edge_weights = val_edge_weights.to(self.device)
-        # self.user_features = self.user_features.to(self.device)
-        # self.product_features = self.product_features.to(self.device)
+        train_edge_index = train_edge_index.to(self.device)
+        train_edge_weights = train_edge_weights.to(self.device)
+        val_edge_index = val_edge_index.to(self.device)
+        val_edge_weights = val_edge_weights.to(self.device)
+        self.user_features = self.user_features.to(self.device)
+        self.product_features = self.product_features.to(self.device)
 
         self.base_gnn_model = BaseGNNRecommender(num_users, num_products, user_feature_dim, product_feature_dim,
                                                  embedding_size, custom_embedding=True).to(self.device)
@@ -112,11 +112,11 @@ class EmbeddingAndGNNWrapper:
             user_review_features = e5_embedding_model(user_features_string_agg["reviews"], batch_size=64,
                                                       max_length=max_length, pooling=pooling)
             torch.save(user_review_features, f"./e5_user_rev_{pooling}_{max_length}.pt")
-        elif embedding_model_name == 'roberta-massive':
+        elif embedding_model_name == 'custom-blair':
             product_meta_features = custom_BLaIR_text_embedding_model(product_features_string["meta"],
                                                                       "blair-roberta-base_massive",
                                                                       batch_size=64, max_length=max_length,
-                                                                      pooling=pooling),
+                                                                      pooling=pooling)
             torch.save(product_meta_features, f"./customblair_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = custom_BLaIR_text_embedding_model(user_features_string_agg["reviews"],
                                                                      "blair-roberta-base_massive",
@@ -127,12 +127,15 @@ class EmbeddingAndGNNWrapper:
             # use default blair
             product_meta_features = BLaIR_roberta_base_text_embedding_model(product_features_string["meta"],
                                                                             batch_size=64, max_length=max_length,
-                                                                            pooling=pooling),
+                                                                            pooling=pooling)
             torch.save(product_meta_features, f"./blairbase_pdt_meta_{pooling}_{max_length}.pt")
             user_review_features = BLaIR_roberta_base_text_embedding_model(user_features_string_agg["reviews"],
                                                                            batch_size=64, max_length=max_length,
                                                                            pooling=pooling)
             torch.save(user_review_features, f"./blairbase_user_rev_{pooling}_{max_length}.pt")
+
+        product_meta_features = product_meta_features.to(self.device)
+        user_review_features = user_review_features.to(self.device)
 
         return product_meta_features, user_review_features
 
@@ -142,10 +145,13 @@ class EmbeddingAndGNNWrapper:
             lambda x: 1 if x == "All Beauty" else 0)
         prod_feat_num = torch.tensor(product_features_numeric.drop(["parent_asin", "price"], axis=1).to_numpy(),
                                      dtype=torch.float)
-        product_features = torch.cat([product_meta_features, prod_feat_num], dim=1)
-
         user_features_num = torch.tensor(user_features_numeric_agg.drop("user_id", axis=1).to_numpy(),
                                          dtype=torch.float)
+
+        prod_feat_num = prod_feat_num.to(self.device)
+        user_features_num = user_features_num.to(self.device)
+
+        product_features = torch.cat([product_meta_features, prod_feat_num], dim=1)
         user_features = torch.cat([user_review_features, user_features_num], dim=1)
 
         return product_features, user_features
