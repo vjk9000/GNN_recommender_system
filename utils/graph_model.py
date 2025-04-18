@@ -30,10 +30,15 @@ class Base_GNN_Model(nn.Module):
             nn.Linear(embedding_dim, 1)
         )
 
-    def forward(self, edge_index, combined_edge_index, user_features, product_features):
+    def forward(self, edge_index, user_features, product_features):
         user_indices = edge_index[0]
         product_indices = edge_index[1]
         offset_product_embeddings = product_indices - self.offset
+
+        # Make the combined edges
+        forward_edge_index = torch.stack([user_indices, product_indices], dim=0)
+        reverse_edge_index = torch.stack([product_indices, user_indices], dim=0)
+        combined_edge_index = torch.cat([forward_edge_index, reverse_edge_index], dim=1)
 
         # transform features
         user_x = self.user_feature_transform(user_features) + self.user_embedding.weight

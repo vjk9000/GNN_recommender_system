@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
-from utils.setup_nodes import combine_edges
-
 def plot_train_val_loss(train_loss, validation_loss = None, figsize = (6.5, 3.4), xlabel = "Epoch", ylabel = "Loss", 
                         title = 'Training and Validation Loss', grid = True):
     plt.figure(figsize=figsize)
@@ -37,11 +35,11 @@ def train_model(model, train_edge_index, train_edge_weights, test_edge_index, te
     best_valid_loss = float("inf")
     best_model_epoch = None
 
-    # Make the combined edges 
-    train_combined_egde_index = combine_edges(train_edge_index)
-    test_combined_egde_index = combine_edges(test_edge_index)
-    train_combined_egde_index = train_combined_egde_index.to(device)
-    test_combined_egde_index = test_combined_egde_index.to(device)
+    # # Make the combined edges 
+    # train_combined_egde_index = combine_edges(train_edge_index)
+    # test_combined_egde_index = combine_edges(test_edge_index)
+    # train_combined_egde_index = train_combined_egde_index.to(device)
+    # test_combined_egde_index = test_combined_egde_index.to(device)
 
     # training loop across epochs
     for epoch in range(1, num_epochs + 1):
@@ -50,7 +48,7 @@ def train_model(model, train_edge_index, train_edge_weights, test_edge_index, te
         optimiser.zero_grad()
 
         # forward pass
-        train_predictions = model(train_edge_index, train_combined_egde_index, user_features, product_features)
+        train_predictions = model(train_edge_index, user_features, product_features)
 
         # MSE 
         train_loss = nn.functional.mse_loss(train_predictions, train_edge_weights)
@@ -62,7 +60,7 @@ def train_model(model, train_edge_index, train_edge_weights, test_edge_index, te
         # training complete move to validation 
         model.eval()
         with torch.no_grad():
-            valid_predictions = model(test_edge_index, test_combined_egde_index, user_features, product_features)
+            valid_predictions = model(test_edge_index, user_features, product_features)
             valid_loss = nn.functional.mse_loss(valid_predictions, test_edge_weights)
     
         # Append losses 
@@ -92,9 +90,9 @@ def train_model_without_test(model, train_edge_index, train_edge_weights, user_f
     # Safety check
     train_losses = []
 
-    # Make the combined edges 
-    train_combined_egde_index = combine_edges(train_edge_index)
-    train_combined_egde_index = train_combined_egde_index.to(device)
+    # # Make the combined edges 
+    # train_combined_egde_index = combine_edges(train_edge_index)
+    # train_combined_egde_index = train_combined_egde_index.to(device)
 
     # training loop across epochs
     for epoch in range(1, num_epochs + 1):
@@ -103,7 +101,7 @@ def train_model_without_test(model, train_edge_index, train_edge_weights, user_f
         optimiser.zero_grad()
 
         # forward pass
-        train_predictions = model(train_edge_index, train_combined_egde_index, user_features, product_features)
+        train_predictions = model(train_edge_index, user_features, product_features)
 
         # MSE 
         train_loss = nn.functional.mse_loss(train_predictions, train_edge_weights)
@@ -124,13 +122,13 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Make the combined edges 
-    test_combined_egde_index = combine_edges(test_edge_index)
-    test_combined_egde_index = test_combined_egde_index.to(device)
+    # # Make the combined edges 
+    # test_combined_egde_index = combine_edges(test_edge_index)
+    # test_combined_egde_index = test_combined_egde_index.to(device)
 
     # Final evaluation on test set
     model.eval()
     with torch.no_grad():
-        test_predictions = model(test_edge_index, test_combined_egde_index, user_features, product_features)
+        test_predictions = model(test_edge_index, user_features, product_features)
         test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
         print(f"Test loss: {test_loss:.4f}")

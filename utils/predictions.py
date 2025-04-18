@@ -1,6 +1,6 @@
 import torch
 
-from utils.graph_helpers import combine_edges
+# from utils.graph_helpers import combine_edges
 
 # helper functions to recommend products
 def recommend_products(model, user_id, user_mapping, product_mapping, user_features, product_features, reverse_mapping, top_k=10, device = None):
@@ -20,12 +20,12 @@ def recommend_products(model, user_id, user_mapping, product_mapping, user_featu
     recommendation_edge_index = torch.tensor([user_nodes, product_nodes], dtype=torch.long).to(device)
 
     # Flip edge
-    reco_combined_egde_index = combine_edges(recommendation_edge_index)
-    reco_combined_egde_index = reco_combined_egde_index.to(device)
+    # reco_combined_egde_index = combine_edges(recommendation_edge_index)
+    # reco_combined_egde_index = reco_combined_egde_index.to(device)
 
     # predictions
     with torch.no_grad():
-        predictions = model(recommendation_edge_index, reco_combined_egde_index, user_features, product_features)
+        predictions = model(recommendation_edge_index, user_features, product_features)
 
     # generate top-k product
     _, top_indices = torch.topk(predictions, k=top_k)
@@ -54,11 +54,11 @@ def evaluate_recall(model, test_edges, k, batch_size, user_nodes, prod_nodes, pr
         user_ids_flat = user_ids_expanded.reshape(-1)
         product_ids_flat = product_ids_expanded.reshape(-1)
         batch_test_edges = torch.stack([user_ids_flat.cpu(), product_ids_flat]).to(device)
-        batch_combined_egde_index = combine_edges(batch_test_edges)
-        batch_combined_egde_index = batch_combined_egde_index.to(device)
+        # batch_combined_egde_index = combine_edges(batch_test_edges)
+        # batch_combined_egde_index = batch_combined_egde_index.to(device)
 
         with torch.no_grad():
-            scores_flat = model(batch_test_edges, batch_combined_egde_index, user_nodes, prod_nodes)
+            scores_flat = model(batch_test_edges, user_nodes, prod_nodes)
         
         scores = scores_flat.view(test_user_ids.shape[0], num_products)
         topk_scores, topk_indices = torch.topk(scores, k, dim=1)
