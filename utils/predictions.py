@@ -3,7 +3,7 @@ import torch
 # from utils.graph_helpers import combine_edges
 
 # helper functions to recommend products
-def recommend_products(model, user_id, user_mapping, product_mapping, user_features, product_features, reverse_mapping, top_k=10, device = None):
+def recommend_products(model, user_id, user_mapping, product_mapping, user_features, product_features, reverse_mapping, ratings = False, top_k=10, device = None):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -28,11 +28,13 @@ def recommend_products(model, user_id, user_mapping, product_mapping, user_featu
         predictions = model(recommendation_edge_index, user_features, product_features)
 
     # generate top-k product
-    _, top_indices = torch.topk(predictions, k=top_k)
+    top_scores, top_indices = torch.topk(predictions, k=top_k)
 
     # indices back to product asin
     recommended_products = [reverse_mapping[idx.item()] for idx in top_indices]
 
+    if ratings:
+        return recommended_products, predictions, top_scores    
     return recommended_products, predictions
 
 def pretty_print_recomendations(recommended_asins, product_df, col):

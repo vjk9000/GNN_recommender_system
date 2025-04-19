@@ -2,6 +2,7 @@ import copy
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
+import seaborn as sns
 
 def plot_train_val_loss(train_loss, validation_loss = None, figsize = (6.5, 3.4), xlabel = "Epoch", ylabel = "Loss", 
                         title = 'Training and Validation Loss', grid = True):
@@ -16,6 +17,22 @@ def plot_train_val_loss(train_loss, validation_loss = None, figsize = (6.5, 3.4)
     plt.grid(grid)
     plt.show()
     return None
+
+def plot_actual_vs_predicted_ratings(test_predictions, test_edge_weights, figsize = (6.5, 3.4)):
+    plt.figure(figsize=figsize)
+
+    # Plot
+    sns.kdeplot(test_predictions, color='blue', fill=True, label="Predicted")
+    sns.kdeplot(test_edge_weights, color="orange", fill=True, label="Actual")
+    
+    # Add labels and title
+    plt.title("Density Plot of Predicted and Actual Ratings")
+    plt.xlabel("Rating")
+    plt.ylabel("Density")
+    plt.legend()
+    
+    # Show the plot
+    plt.show()
 
 def train_model(model, train_edge_index, train_edge_weights, test_edge_index, test_edge_weights, user_features, product_features, 
                 num_epochs=100, lr=0.01, optimiser = None, device = None, print_progress = False, print_freq = 10):
@@ -118,7 +135,7 @@ def train_model_without_test(model, train_edge_index, train_edge_weights, user_f
     
     return train_losses
 
-def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, device = None):
+def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, device = None, plot = False):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -132,3 +149,6 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
         test_predictions = model(test_edge_index, user_features, product_features)
         test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
         print(f"Test loss: {test_loss:.4f}")
+
+    if plot:
+        plot_actual_vs_predicted_ratings(test_predictions.cpu(), test_edge_weights.cpu())
