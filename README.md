@@ -14,4 +14,4 @@ I just like to label the files in numerical order so easier to see
     * 00: simple run   
 - 02: Embedding experiments
 - 03: Architecture experiments
-- 04: Combined experiments 
+- 04: Hyperparam tuning of models 

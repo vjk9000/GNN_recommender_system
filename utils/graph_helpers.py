@@ -1,5 +1,6 @@
 import copy
 import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import torch.nn as nn
 import seaborn as sns
@@ -35,7 +36,7 @@ def plot_actual_vs_predicted_ratings(test_predictions, test_edge_weights, figsiz
     plt.show()
 
 def train_model(model, train_edge_index, train_edge_weights, test_edge_index, test_edge_weights, user_features, product_features, 
-                num_epochs=100, lr=0.01, optimiser = None, device = None, print_progress = False, print_freq = 10):
+                num_epochs=100, lr=0.01, optimiser = None, device = None, print_progress = False, print_freq = 10, give_epoch = False):
     
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -93,6 +94,8 @@ def train_model(model, train_edge_index, train_edge_weights, test_edge_index, te
         if epoch % print_freq == 0 and print_progress:
             print(f'Epoch: {epoch}, Train Loss: {train_loss:.4f}, Val Loss: {valid_loss:.4f}, best model epoch: {best_model_epoch}')
     
+    if give_epoch:
+        return train_losses, test_losses, best_model_state, best_model_epoch
     return train_losses, test_losses, best_model_state
 
 def train_model_without_test(model, train_edge_index, train_edge_weights, user_features, product_features,
@@ -135,7 +138,7 @@ def train_model_without_test(model, train_edge_index, train_edge_weights, user_f
     
     return train_losses
 
-def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, device = None, plot = False):
+def final_evaluation(model, test_edge_index, test_edge_weights, user_features, product_features, device = None, plot = False, print_test = True):
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -148,10 +151,14 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
     with torch.no_grad():
         test_predictions = model(test_edge_index, user_features, product_features)
         test_loss = nn.functional.mse_loss(test_predictions, test_edge_weights)
-        print(f"Test loss: {test_loss:.4f}")
 
     if plot:
         plot_actual_vs_predicted_ratings(test_predictions.cpu(), test_edge_weights.cpu())
+    
+    if print_test:
+        print(f"Test loss: {test_loss:.4f}")
+    else:
+        return test_loss
 
 def plot_weights_heatmap_and_density(weights, attribute_key):
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -192,3 +199,14 @@ def plot_activation_heatmap_and_density(activations_of_interest):
     # Adjust layout and show the plot
     plt.tight_layout()
     plt.show()
+
+def make_df(config_ls, config_ls_names, train_loss_ls, test_loss_ls, full_test_loss_ls, best_epoch_ls, best_test_loss_ls):
+    df = pd.DataFrame()
+    for index, name in enumerate(config_ls_names):
+        df[name] = [x[index] for x in config_ls]
+    df["train_loss"] = train_loss_ls
+    df["test_loss"] = test_loss_ls
+    df["final_test_loss"] = full_test_loss_ls
+    df["best_epoch"] = best_epoch_ls
+    df["best_test_loss"] = best_test_loss_ls
+    return df
