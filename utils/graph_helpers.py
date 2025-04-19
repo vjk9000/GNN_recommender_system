@@ -152,3 +152,43 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
 
     if plot:
         plot_actual_vs_predicted_ratings(test_predictions.cpu(), test_edge_weights.cpu())
+
+def plot_weights_heatmap_and_density(weights, attribute_key):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+    # Heatmap (subplot 1)
+    sns.heatmap(weights, annot=False, cmap="viridis", ax=axes[0])
+    axes[0].set_title(f"Heatmap of {attribute_key}")
+    axes[0].set_xlabel("Input Features")
+    axes[0].set_ylabel("Output Features")
+
+    # Density plot (subplot 2)
+    sns.kdeplot(weights.flatten(), fill=True, color="blue", ax=axes[1])
+    axes[1].set_title(f"Density Plot of {attribute_key}")
+    axes[1].set_xlabel("Weight Value")
+    axes[1].set_ylabel("Density")
+
+    # Adjust layout and show the plot
+    plt.tight_layout()
+    plt.show()
+
+def plot_activation_heatmap_and_density(activations_of_interest):
+    # Create a figure with 2 subplots: one for the heatmap and one for the density plot
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+    
+    # Heatmap (subplot 1)
+    sns.heatmap(activations_of_interest, vmin=-100, vmax=100, annot=False, cmap="viridis", ax=axes[0])
+    axes[0].set_title("Activations")
+    axes[0].set_xlabel("Features")
+    axes[0].set_ylabel("Users")
+    
+    # Density plot (subplot 2)
+    sns.kdeplot(activations_of_interest.flatten(), fill=True, color="blue", ax=axes[1])
+    axes[1].set_title("Density Plot")
+    axes[1].set_xlabel("Activations")
+    axes[1].set_ylabel("Density")
+    axes[1].set_xlim(-10000, 10000)
+    
+    # Adjust layout and show the plot
+    plt.tight_layout()
+    plt.show()
