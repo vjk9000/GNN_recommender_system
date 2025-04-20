@@ -1,4 +1,6 @@
 import pandas as pd
+import re
+import numpy as np
 
 def concat_item_metadata(row):
     meta = ""
@@ -96,3 +98,19 @@ def make_user_nodes(user_df):
     ]
     df = df.reset_index()
     return df
+
+def preprocess(row_text):
+    if row_text is None or len(row_text) == 0:
+        return ""
+    if isinstance(row_text, np.ndarray):
+        row_text = ' '.join(row_text)
+    # remove unknown characters
+    row_text = re.sub(r'[^a-zA-Z0-9\s]', ' ', (row_text
+                                                 .replace('\t', ' ')
+                                                 .replace('\n', ' ')
+                                                 .replace('\r', '')
+                                                 .strip()
+                                                 ))
+    # remove extra spaces
+    row_text = re.sub(r'\s+', ' ', row_text)
+    return row_text
