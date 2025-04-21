@@ -2,16 +2,12 @@
 Deep learning project to use GNN models to recommend items to customers 
 
 # Structure of code 
-I just like to label the files in numerical order so easier to see
 
-- 00: set up related    
-    * 00: download data  
-    * 01: split into train test validation   
-    * 02: embed data (standard default)  
-    * 03: template code with explanation   
-    * 04: template code without explanation   
+- 00: set up related
 - 01: base model gnn   
-    * 00: simple run   
 - 02: Embedding experiments
 - 03: Architecture experiments
 - 04: Hyperparam tuning of models 
+
+# How to run 
+1. Run the `00` coded notebooks to set up all the necessary files. Beyond that, the rest can be run in any order. 
