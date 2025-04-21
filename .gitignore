@@ -6,6 +6,7 @@ custom_blair/**/*
 
 # Data 
 data/
+results/
 
 # Others 
 others/
