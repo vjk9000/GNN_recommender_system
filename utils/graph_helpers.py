@@ -1,9 +1,14 @@
 import copy
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
 import seaborn as sns
+
+from utils.setup_nodes import create_edge_lists, create_user_df
+from utils.graph_model import Base_GNN_Model
+from utils.general import seed_everything
 
 def plot_train_val_loss(train_loss, validation_loss = None, figsize = (6.5, 3.4), xlabel = "Epoch", ylabel = "Loss", 
                         title = 'Training and Validation Loss', grid = True):
@@ -210,3 +215,95 @@ def make_df(config_ls, config_ls_names, train_loss_ls, test_loss_ls, full_test_l
     df["best_epoch"] = best_epoch_ls
     df["best_test_loss"] = best_test_loss_ls
     return df
+
+def single_grid_search(embed_tye, prod_embed, data_dir, product_dir, embedding_dir, user_split, product_cols, user_cols, edge_cols, device, seed = 42):
+    """
+    A bit of inefficiency with the multiple reads but done just for simplicity
+    """
+
+    # set seed
+    seed_everything(seed)
+
+    # Load data
+    product_df = pd.read_parquet(f"{data_dir}/{product_dir}/product_df.parquet", columns = product_cols)
+    train_user_df = pd.read_parquet(f"{data_dir}/{user_split}_split/train_agg.parquet", columns = user_cols)
+    train_user_edges = pd.read_parquet(f"{data_dir}/{user_split}_split/train.parquet", columns = edge_cols)
+    if user_split == "train_test_valid":
+        test_user_df = pd.read_parquet(f"{data_dir}/{user_split}_split/valid_agg.parquet", columns = user_cols)
+        test_user_edges = pd.read_parquet(f"{data_dir}/{user_split}_split/valid.parquet", columns = edge_cols)
+    else:
+        test_user_df = pd.read_parquet(f"{data_dir}/{user_split}_split/test_agg.parquet", columns = user_cols)
+        test_user_edges = pd.read_parquet(f"{data_dir}/{user_split}_split/test.parquet", columns = edge_cols)
+    
+    # Get embedding
+    prod_embed_name = f"{prod_embed}_features_{embed_tye}"
+    user_embed_name = f"user_reviews_features_{embed_tye}"
+    
+    # make user df
+    product_embedding = torch.load(f"{data_dir}/{embedding_dir}/product/{prod_embed_name}.pt")
+    train_user_embedding = torch.load(f"{data_dir}/{embedding_dir}/{user_split}_split/train_{user_embed_name}.pt")
+    if user_split == "train_test_valid":
+        test_user_embedding = torch.load(f"{data_dir}/{embedding_dir}/{user_split}_split/valid_{user_embed_name}.pt")
+    else:
+        test_user_embedding = torch.load(f"{data_dir}/{embedding_dir}/{user_split}_split/test_{user_embed_name}.pt")
+
+    train_user_df["embedding"] = list(train_user_embedding.numpy())
+    test_user_df["embedding"] = list(test_user_embedding.numpy())
+
+    user_df = create_user_df(train_user_df, test_user_df)
+    
+    # Set up id mapping
+    offset = user_df.user_id.nunique()
+    user_id_to_idx = {unique_id : idx for idx, unique_id in enumerate(user_df.user_id.unique())}
+    prod_id_to_idx = {unique_id : offset + idx for idx, unique_id in enumerate(product_df.parent_asin.unique())}
+    
+    # Add to df
+    product_df["prod_idx"] = product_df.parent_asin.apply(lambda x: prod_id_to_idx[x])
+    train_user_edges["user_idx"] = train_user_edges.user_id.apply(lambda x: user_id_to_idx[x])
+    test_user_edges["user_idx"] = test_user_edges.user_id.apply(lambda x: user_id_to_idx[x])
+    train_user_edges["prod_idx"] = train_user_edges.parent_asin.apply(lambda x: prod_id_to_idx[x])
+    test_user_edges["prod_idx"] = test_user_edges.parent_asin.apply(lambda x: prod_id_to_idx[x])
+    
+    # Concat product nodes 
+    product_nodes = torch.cat([torch.tensor(product_df.drop(["parent_asin", "prod_idx"], axis = 1).to_numpy()), product_embedding], dim = 1)
+    
+    # concat user nodes 
+    user_embed = torch.tensor(np.vstack(user_df["embedding"].values))
+    user_info = torch.tensor(user_df.drop(["user_id", "embedding"], axis = 1).to_numpy())
+    user_nodes = torch.cat([user_info, user_embed], dim = 1)
+    
+    # Create edge list
+    train_edge_index, train_edge_weights = create_edge_lists(train_user_edges)
+    test_edge_index, test_edge_weights = create_edge_lists(train_user_edges)
+    
+    # Move to gpu
+    product_nodes = product_nodes.type(torch.float).to(device)
+    user_nodes = user_nodes.type(torch.float).to(device)
+    train_edge_index = train_edge_index.to(device)
+    train_edge_weights = train_edge_weights.to(device)
+    test_edge_index = test_edge_index.to(device)
+    test_edge_weights = test_edge_weights.to(device)
+
+    # model features
+    num_users = len(user_df)
+    num_products = len(product_df)
+    user_feature_dim = user_nodes.shape[1]
+    product_feature_dim = product_nodes.shape[1]
+    embedding_dim = 64
+
+    # Instantiate the model
+    model = Base_GNN_Model(num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim)
+
+    # move the model 
+    model.to(device)
+
+    # Train model 
+    train_loss, test_loss, best_model, best_epoch = train_model(model, train_edge_index, train_edge_weights, test_edge_index, test_edge_weights,
+                                                                user_nodes, product_nodes, num_epochs = 1000, print_progress=False, give_epoch=True)
+    final_test_loss = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
+    
+    # best loss 
+    model.load_state_dict(best_model)
+    best_test_loss = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
+
+    return train_loss, test_loss, final_test_loss, best_epoch, best_test_loss
