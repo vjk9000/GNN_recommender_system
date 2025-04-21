@@ -46,6 +46,6 @@ for model_type in ["base", "512"]:
     title = torch.load(f"{save_dir}/{prod_dir}/title_features_{model_type}.pt")
     details = torch.load(f"{save_dir}/{prod_dir}/details_features_{model_type}.pt")
     combined = torch.cat([title, details], dim = 1)
-    save_embedding(combined, f"{save_dir}/{prod_dir}/combined_features_{model_type}.pt")
+    save_embedding(combined, f"{save_dir}/{prod_dir}/combined_title_details_features_{model_type}.pt")
     del title, details, combined
     print(f"combine done for {model_type}")
