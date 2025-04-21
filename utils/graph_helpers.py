@@ -163,7 +163,7 @@ def final_evaluation(model, test_edge_index, test_edge_weights, user_features, p
     if print_test:
         print(f"Test loss: {test_loss:.4f}")
     else:
-        return test_loss
+        return test_loss, test_predictions.cpu()
 
 def plot_weights_heatmap_and_density(weights, attribute_key):
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
@@ -300,10 +300,10 @@ def single_grid_search(embed_tye, prod_embed, data_dir, product_dir, embedding_d
     # Train model 
     train_loss, test_loss, best_model, best_epoch = train_model(model, train_edge_index, train_edge_weights, test_edge_index, test_edge_weights,
                                                                 user_nodes, product_nodes, num_epochs = 1000, print_progress=False, give_epoch=True)
-    final_test_loss = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
+    final_test_loss, _ = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
     
     # best loss 
     model.load_state_dict(best_model)
-    best_test_loss = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
+    best_test_loss, _ = final_evaluation(model, test_edge_index, test_edge_weights, user_nodes, product_nodes, device, plot=False, print_test=False)
 
     return train_loss, test_loss, final_test_loss, best_epoch, best_test_loss
