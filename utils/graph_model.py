@@ -135,8 +135,10 @@ class Experiment_1(nn.Module):
         return predictions
     
 class GNNRecommenderwithSkipConnections(nn.Module):
-    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64, dropout_prob = 0.2):
         super(GNNRecommenderwithSkipConnections, self).__init__()
+
+        self.dropout_prob = dropout_prob
 
         # feature transformation layers
         self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
@@ -173,7 +175,7 @@ class GNNRecommenderwithSkipConnections(nn.Module):
         # GNN layers
         # Layer 1: Add skip connection from the input features
         x1 = F.relu(self.bn1(self.conv1(x, combined_edge_index)))
-        x1 = F.dropout(x1, p=0.2, training=self.training)
+        x1 = F.dropout(x1, p=self.dropout_prob, training=self.training)
         x1 = x1 + x  # Skip connection from input
 
         x2 = self.bn2(self.conv2(x1, combined_edge_index))
@@ -199,8 +201,10 @@ class GNNRecommenderwithSkipConnections(nn.Module):
         return predictions
     
 class GNNSAGERecommenderwithSkipConnections(nn.Module):
-    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64, dropout_prob = 0.2):
         super(GNNSAGERecommenderwithSkipConnections, self).__init__()
+
+        self.dropout_prob = dropout_prob
 
         # feature transformation layers
         self.user_feature_transform = nn.Linear(user_feature_dim, embedding_dim)
@@ -237,7 +241,7 @@ class GNNSAGERecommenderwithSkipConnections(nn.Module):
         # GNN layers
         # Layer 1: Add skip connection from the input features
         x1 = F.relu(self.bn1(self.conv1(x, combined_edge_index)))
-        x1 = F.dropout(x1, p=0.2, training=self.training)
+        x1 = F.dropout(x1, p=self.dropout_prob, training=self.training)
         x1 = x1 + x  # Skip connection from input
 
         x2 = self.bn2(self.conv2(x1, combined_edge_index))
