@@ -184,7 +184,7 @@ def plot_weights_heatmap_and_density(weights, attribute_key):
     plt.tight_layout()
     plt.show()
 
-def plot_activation_heatmap_and_density(activations_of_interest):
+def plot_activation_heatmap_and_density(activations_of_interest, fp = None):
     # Create a figure with 2 subplots: one for the heatmap and one for the density plot
     fig, axes = plt.subplots(1, 2, figsize=(12, 6))
     
@@ -203,7 +203,11 @@ def plot_activation_heatmap_and_density(activations_of_interest):
     
     # Adjust layout and show the plot
     plt.tight_layout()
-    plt.show()
+
+    if fp is None:
+        plt.show()
+    else:
+        plt.savefig(f"{fp}.jpg", dpi = 300, bbox_inches='tight')
 
 def make_df(config_ls, config_ls_names, train_loss_ls, test_loss_ls, full_test_loss_ls, best_epoch_ls, best_test_loss_ls):
     df = pd.DataFrame()
