@@ -5,8 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Base_GNN_Model(nn.Module):
-    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, embedding_dim=64, dropout_prob = 0.2):
         super(Base_GNN_Model, self).__init__()
+
+        self.dropout_prob = dropout_prob
 
         # offset for prod
         self.offset = num_users
@@ -49,7 +51,7 @@ class Base_GNN_Model(nn.Module):
 
         # # GNN layers
         x = F.relu(self.conv1(x, combined_edge_index))
-        x = F.dropout(x, p=0.2, training=self.training)
+        x = F.dropout(x, p=self.dropout_prob, training=self.training)
         x = self.conv2(x, combined_edge_index)
 
         # Split back the embeddings 
