@@ -101,3 +101,17 @@ def get_top_k_preds(model, test_user_idx_ls, k, batch_size, user_nodes, prod_nod
 #         sol.extend(recall_hits)
     
 #     return torch.tensor(sol).mean()
+
+def dcg_v1(scores):
+    scores = torch.tensor(scores, dtype=torch.float32)
+    ranks = torch.arange(1, len(scores) + 1, dtype=torch.float32)
+    discounts = torch.log2(ranks + 1)
+    return torch.sum(scores / discounts).item()
+
+def ndcg_v1(true_idx, predicted_idx):
+    relevance_scores = [1 if x in set(true_idx) else 0 for x in predicted_idx]
+    ideal_relevance_scores = [1 for x in true_idx]
+    dcg_10 = dcg_v1(relevance_scores)
+    idcg_10 = dcg_v1(ideal_relevance_scores)
+    ndcg_10 = dcg_10 / idcg_10
+    return ndcg_10
