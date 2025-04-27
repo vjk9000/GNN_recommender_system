@@ -16,3 +16,13 @@ The folder utils has the necessary helper codes for the various notebooks.
 
 # How to run 
 1. Run the `00` coded notebooks to set up all the necessary files. Beyond that, the rest can be run in any order. 
+
+# Acknowledgements 
+The dataset was obtained from the Amazon 2023 as found here: https://amazon-reviews-2023.github.io/
+
+@article{hou2024bridging,
+  title={Bridging Language and Items for Retrieval and Recommendation},
+  author={Hou, Yupeng and Li, Jiacheng and He, Zhankui and Yan, An and Chen, Xiusi and McAuley, Julian},
+  journal={arXiv preprint arXiv:2403.03952},
+  year={2024}
+}
