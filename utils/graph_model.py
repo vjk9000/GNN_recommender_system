@@ -1,4 +1,5 @@
-from torch_geometric.nn import GCNConv, SAGEConv
+
+from torch_geometric.nn import GCNConv, SAGEConv, GATConv, GATv2Conv
 
 import torch
 import torch.nn as nn
@@ -267,3 +268,124 @@ class GNNSAGERecommenderwithSkipConnections(nn.Module):
         predictions = self.predictor(dot_product).squeeze()
 
         return predictions
+
+class GAT_model(torch.nn.Module):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, 
+                 hidden_dim=64, dropout_prob=0.2):  # Added dropout_prob
+        super().__init__()
+        self.dropout_prob = dropout_prob
+
+        self.user_feature_transform = nn.Linear(user_feature_dim, hidden_dim)
+        self.product_feature_transform = nn.Linear(product_feature_dim, hidden_dim)
+
+        self.conv1 = GATConv(hidden_dim, hidden_dim)
+        self.conv2 = GCNConv(hidden_dim, hidden_dim)
+
+        self.predictor = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, edge_index, user_features, product_features):
+
+        # Obtains raw user and product indices
+        user_indices = edge_index[0]
+        product_indices = edge_index[1] - user_features.shape[0]
+
+        # transform features
+        user_x = self.user_feature_transform(user_features)
+        product_x = self.product_feature_transform(product_features)
+
+        # combine user and product features
+        x = torch.cat([user_x, product_x], dim=0)
+
+        # combined edge index for message passing
+        combined_edge_index = torch.cat([
+            edge_index,
+            torch.stack([edge_index[1], edge_index[0]], dim=0)
+        ], dim=1)
+
+        # GNN layers
+        x = F.relu(self.conv1(x, combined_edge_index))
+        x = F.dropout(x, p=self.dropout_prob, training=self.training)  # Modified
+        x = self.conv2(x, combined_edge_index)
+
+        user_embeddings = x[:len(user_x)]
+        product_embeddings = x[len(user_x):]
+
+        # embeddings for the specific user-product pairs in edge_index
+        user_emb = user_embeddings[user_indices]
+        product_emb = product_embeddings[product_indices]
+
+        # Normalize the embeddings
+        user_emb_norm = F.normalize(user_emb, p=2, dim=-1)
+        product_emb_norm = F.normalize(product_emb, p=2, dim=-1)
+        
+        # Compute element-wise dot product
+        dot_product = user_emb_norm * product_emb_norm
+
+        # predict ratings
+        predictions = self.predictor(dot_product).squeeze()
+
+        return predictions
+
+class GATv2_model(torch.nn.Module):
+    def __init__(self, num_users, num_products, user_feature_dim, product_feature_dim, 
+                 hidden_dim=64, heads=2, dropout_prob=0.2):  # Added dropout_prob
+        super().__init__()
+        self.dropout_prob = dropout_prob
+
+        self.user_feature_transform = nn.Linear(user_feature_dim, hidden_dim)
+        self.product_feature_transform = nn.Linear(product_feature_dim, hidden_dim)
+
+        self.conv1 = GATv2Conv(hidden_dim, hidden_dim, heads=heads, concat=False)
+        self.conv2 = GATv2Conv(hidden_dim, hidden_dim, heads=heads, concat=False)
+
+        self.predictor = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, 1)
+        )
+
+    def forward(self, edge_index, user_features, product_features):
+      # Obtains raw user and product indices
+      user_indices = edge_index[0]
+      product_indices = edge_index[1] - user_features.shape[0]
+
+      # transform features
+      user_x = self.user_feature_transform(user_features)
+      product_x = self.product_feature_transform(product_features)
+
+      # combine user and product features
+      x = torch.cat([user_x, product_x], dim=0)
+
+      # combined edge index for message passing
+      combined_edge_index = torch.cat([
+          edge_index,
+          torch.stack([edge_index[1], edge_index[0]], dim=0)
+      ], dim=1)
+
+      # GNN layers
+      x = F.relu(self.conv1(x, combined_edge_index))
+      x = F.dropout(x, p=self.dropout_prob, training=self.training)  # Modified
+      x = self.conv2(x, combined_edge_index)
+
+      user_embeddings = x[:len(user_x)]
+      product_embeddings = x[len(user_x):]
+
+      # embeddings for the specific user-product pairs in edge_index
+      user_emb = user_embeddings[user_indices]
+      product_emb = product_embeddings[product_indices]
+
+      # Normalize the embeddings
+      user_emb_norm = F.normalize(user_emb, p=2, dim=-1)
+      product_emb_norm = F.normalize(product_emb, p=2, dim=-1)
+      
+      # Compute element-wise dot product
+      dot_product = user_emb_norm * product_emb_norm
+
+      # predict ratings
+      predictions = self.predictor(dot_product).squeeze()
+
+      return predictions
